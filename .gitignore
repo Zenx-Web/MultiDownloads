@@ -1,0 +1,95 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Next.js
+frontend/.next/
+frontend/out/
+frontend/build
+frontend/.vercel
+
+# Production
+dist/
+build/
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Local env files
+.env
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Uploads and downloads
+backend/uploads/
+backend/downloads/
+*.mp4
+*.mp3
+*.webm
+*.avi
+*.mov
+*.mkv
+*.flv
+*.wmv
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.bmp
+*.wav
+*.flac
+*.aac
+*.ogg
+*.m4a
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# yt-dlp binary
+backend/yt-dlp
+backend/yt-dlp.exe
+
+# FFmpeg
+backend/ffmpeg/
+
+# Logs
+logs/
+*.log
+
+# Lock files (optional - uncomment if you want to ignore)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
