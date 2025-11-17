@@ -1,6 +1,319 @@
-MultiDownloader Web App (CoPilot Plan)
+# 🚀 MultiDownloader - Download & Convert Media
 
-A comprehensive web app that lets users paste any link (YouTube, Instagram, Facebook, Pinterest, etc.) to download or convert content. We’ll build a modern React (Next.js) frontend with a Node.js backend (e.g. Express or NestJS) to handle downloading and conversion tasks. Key features include multi-platform video downloads and a suite of conversion tools (video/audio/image converters). The site will have a free tier with limits (daily quotas, speed caps) and a premium tier (unlimited high-speed downloads) to enable monetization.
+A powerful web application for downloading videos from multiple platforms (YouTube, Instagram, Facebook, TikTok) and converting media files (video, audio, images) to various formats.
+
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)
+
+## ✨ Features
+
+### 📥 Video Downloaders
+- **YouTube Downloader** - Download videos in multiple resolutions (144p - 4K)
+- **Instagram Downloader** - Download Reels, Stories, IGTV videos
+- **Facebook Downloader** - Download Facebook videos and Facebook Watch content
+- **TikTok Downloader** - Download TikTok videos without watermark
+
+### 🔄 Media Converters
+- **Video Converter** - Convert between MP4, AVI, MOV, MKV, WebM, FLV, WMV formats
+- **Audio Converter** - Convert between MP3, WAV, FLAC, AAC, OGG, M4A formats
+- **Image Converter** - Convert and resize JPG, PNG, WebP, AVIF, GIF, BMP images
+
+### 👤 User Management
+- Supabase authentication (Sign up, Login, Password reset)
+- User profiles with subscription tiers
+- Download history tracking
+- Usage statistics and analytics
+
+### 🎯 Subscription Tiers
+- **Free Tier**: 5 downloads/day, 720p max resolution
+- **Premium Tier**: Unlimited downloads, 4K resolution, priority processing
+- **Enterprise Tier**: API access, custom branding, dedicated support
+
+## 🛠️ Tech Stack
+
+### Backend
+- **Node.js** + **Express** + **TypeScript**
+- **yt-dlp-wrap** - For reliable video downloads
+- **FFmpeg** - For video/audio conversion
+- **Sharp** - For image processing
+- **Supabase** - Authentication and PostgreSQL database
+- **Multer** - File upload handling
+
+### Frontend
+- **Next.js 14** (App Router)
+- **React** + **TypeScript**
+- **Tailwind CSS**
+- **Supabase SSR** - Client-side authentication
+
+## 📦 Installation
+
+### Prerequisites
+- Node.js >= 18.0.0
+- npm or yarn
+- FFmpeg (for media conversion)
+- Supabase account
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/yourusername/multidownloader.git
+cd multidownloader
+```
+
+### 2. Backend Setup
+```bash
+cd backend
+npm install
+
+# Copy environment variables
+cp .env.example .env
+
+# Edit .env with your Supabase credentials
+```
+
+### 3. Frontend Setup
+```bash
+cd ../frontend
+npm install
+
+# Copy environment variables
+cp .env.local.example .env.local
+
+# Edit .env.local with your Supabase credentials
+```
+
+### 4. Supabase Setup
+Follow the instructions in [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) to:
+1. Create a Supabase project
+2. Run the database schema SQL
+3. Set up Row Level Security policies
+4. Get your API credentials
+
+### 5. Install FFmpeg (Required for converters)
+
+**Windows:**
+```bash
+# Using Chocolatey
+choco install ffmpeg
+
+# Or download from https://ffmpeg.org/download.html
+```
+
+**macOS:**
+```bash
+brew install ffmpeg
+```
+
+**Linux:**
+```bash
+sudo apt-get install ffmpeg
+```
+
+## 🚀 Running the Application
+
+### Development Mode
+
+**Terminal 1 - Backend:**
+```bash
+cd backend
+npm run dev
+# Runs on http://localhost:5000
+```
+
+**Terminal 2 - Frontend:**
+```bash
+cd frontend
+npm run dev
+# Runs on http://localhost:3000
+```
+
+### Production Build
+
+**Backend:**
+```bash
+cd backend
+npm run build
+npm start
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm run build
+npm start
+```
+
+## 📁 Project Structure
+
+```
+multidownloader/
+├── backend/
+│   ├── src/
+│   │   ├── config/          # Configuration files
+│   │   ├── controllers/     # Route controllers
+│   │   ├── middlewares/     # Express middlewares
+│   │   ├── routes/          # API routes
+│   │   ├── services/        # Business logic
+│   │   └── types/           # TypeScript types
+│   └── package.json
+├── frontend/
+│   ├── app/                 # Next.js pages
+│   ├── components/          # React components
+│   ├── contexts/            # React contexts
+│   ├── lib/                 # Utility functions
+│   └── package.json
+├── SUPABASE_SETUP.md        # Database setup guide
+└── README.md
+```
+
+## 🔑 Environment Variables
+
+### Backend (.env)
+```env
+PORT=5000
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:3000
+
+# Supabase
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# FFmpeg (optional, auto-detects)
+FFMPEG_PATH=ffmpeg
+FFPROBE_PATH=ffprobe
+```
+
+### Frontend (.env.local)
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000/api
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+## 📚 API Documentation
+
+### Authentication Endpoints
+- `POST /api/auth/signup` - Create new account
+- `POST /api/auth/signin` - Login
+- `POST /api/auth/signout` - Logout
+- `POST /api/auth/reset-password` - Request password reset
+- `GET /api/auth/me` - Get current user (protected)
+
+### Download Endpoints
+- `POST /api/download` - Start download job
+- `POST /api/download/info` - Get video info without downloading
+- `GET /api/download/file/:jobId` - Download completed file
+- `GET /api/status/:jobId` - Get job status
+
+### Conversion Endpoints
+- `POST /api/convert/video` - Convert video format
+- `POST /api/convert/audio` - Convert audio format
+- `POST /api/convert/image` - Convert image format
+
+## 🎨 Features in Detail
+
+### Download Flow
+1. User pastes URL
+2. Click "Get Info" to preview video details
+3. Select quality/format options
+4. Download starts with progress tracking
+5. File is streamed to browser
+
+### Conversion Flow
+1. User uploads file (drag & drop or click)
+2. Select target format and quality
+3. Conversion happens server-side with FFmpeg/Sharp
+4. Progress updates in real-time
+5. Converted file downloads automatically
+
+### Authentication Flow
+1. User signs up with email/password
+2. Email verification sent (optional)
+3. User can login and access premium features
+4. Session managed via Supabase JWT tokens
+
+## 🔒 Security Features
+
+- Row Level Security (RLS) on all database tables
+- JWT token verification for protected routes
+- Rate limiting on API endpoints
+- File size restrictions
+- CORS configuration
+- Environment variable protection
+
+## 📊 Database Schema
+
+See [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) for complete schema including:
+- User profiles
+- Download history
+- Conversion history
+- Usage statistics
+
+## 🚦 Rate Limiting
+
+- Free tier: 100 requests per 15 minutes
+- Downloads tracked per user per day
+- Conversion limits based on subscription tier
+
+## 🐛 Troubleshooting
+
+### yt-dlp not found
+yt-dlp is auto-downloaded on first use. If issues occur:
+```bash
+cd backend
+npm install yt-dlp-wrap
+```
+
+### FFmpeg not found
+Install FFmpeg system-wide or set `FFMPEG_PATH` in `.env`
+
+### Port already in use
+```bash
+# Kill processes on ports 3000 and 5000
+# Windows:
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+
+# macOS/Linux:
+lsof -ti:3000 | xargs kill -9
+```
+
+### Supabase connection issues
+- Verify credentials in `.env` files
+- Check Supabase project is active
+- Ensure RLS policies are set up correctly
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📝 License
+
+This project is licensed under the MIT License.
+
+## 🙏 Acknowledgments
+
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - Video download engine
+- [FFmpeg](https://ffmpeg.org/) - Media conversion
+- [Sharp](https://sharp.pixelplumbing.com/) - Image processing
+- [Supabase](https://supabase.com/) - Authentication and database
+- [Next.js](https://nextjs.org/) - React framework
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
+
+## ⚠️ Disclaimer
+
+This tool is for personal use only. Please respect copyright laws and platform terms of service. Users are responsible for ensuring they have the right to download and convert content.
+
+---
+
+Made with ❤️ using Next.js, Express, and Supabase
 
 Features & Functionality
 
