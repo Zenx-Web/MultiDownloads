@@ -1,6 +1,11 @@
+'use client';
+
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Navbar() {
+  const { user, signOut } = useAuth();
+
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4">
@@ -47,12 +52,28 @@ export default function Navbar() {
 
           {/* Auth Buttons */}
           <div className="flex items-center space-x-4">
-            <button className="text-gray-700 hover:text-blue-600 transition-colors font-medium">
-              Login
-            </button>
-            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-              Sign Up
-            </button>
+            {user ? (
+              <>
+                <span className="text-gray-700 text-sm hidden md:inline">
+                  {user.email}
+                </span>
+                <button
+                  onClick={() => signOut()}
+                  className="text-gray-700 hover:text-blue-600 transition-colors font-medium"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="text-gray-700 hover:text-blue-600 transition-colors font-medium">
+                  Login
+                </Link>
+                <Link href="/signup" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                  Sign Up
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}

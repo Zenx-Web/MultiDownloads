@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import downloadRoutes from './downloadRoutes';
 import convertRoutes from './convertRoutes';
+import authRoutes from './authRoutes';
 import { getJobStatus } from '../controllers/downloadController';
 
 const router = Router();
@@ -8,6 +9,7 @@ const router = Router();
 // Mount route modules
 router.use('/download', downloadRoutes);
 router.use('/convert', convertRoutes);
+router.use('/auth', authRoutes);
 
 // Status endpoint at root level
 router.get('/status/:jobId', getJobStatus);

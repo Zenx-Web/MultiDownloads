@@ -56,6 +56,13 @@ export const config = {
   //   url: process.env.DATABASE_URL,
   // },
 
+  // Supabase
+  supabase: {
+    url: process.env.SUPABASE_URL || '',
+    anonKey: process.env.SUPABASE_ANON_KEY || '',
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  },
+
   // TODO: Add JWT config when implementing auth
   // jwt: {
   //   secret: process.env.JWT_SECRET,
