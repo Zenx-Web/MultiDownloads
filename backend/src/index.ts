@@ -19,20 +19,10 @@ const app: Application = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS - handle multiple origins properly
-const allowedOrigins = config.corsOrigin.split(',').map(o => o.trim());
+// CORS - simplified to allow all origins for now
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, Postman, etc.)
-      if (!origin) return callback(null, true);
-      
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: true, // Allow all origins temporarily
     credentials: true,
   })
 );
