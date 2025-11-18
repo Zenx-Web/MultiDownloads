@@ -114,36 +114,36 @@ CREATE POLICY "Profiles are created automatically on signup"
   ON profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
 
--- Download history policies
-CREATE POLICY "Users can view their own download history"
-  ON download_history FOR SELECT
-  USING (auth.uid() = user_id);
+  -- Download history policies
+  CREATE POLICY "Users can view their own download history"
+    ON download_history FOR SELECT
+    USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert their own download history"
-  ON download_history FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  CREATE POLICY "Users can insert their own download history"
+    ON download_history FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
 
--- Conversion history policies
-CREATE POLICY "Users can view their own conversion history"
-  ON conversion_history FOR SELECT
-  USING (auth.uid() = user_id);
+  -- Conversion history policies
+  CREATE POLICY "Users can view their own conversion history"
+    ON conversion_history FOR SELECT
+    USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert their own conversion history"
-  ON conversion_history FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  CREATE POLICY "Users can insert their own conversion history"
+    ON conversion_history FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
 
--- Usage stats policies
-CREATE POLICY "Users can view their own usage stats"
-  ON usage_stats FOR SELECT
-  USING (auth.uid() = user_id);
+  -- Usage stats policies
+  CREATE POLICY "Users can view their own usage stats"
+    ON usage_stats FOR SELECT
+    USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert their own usage stats"
-  ON usage_stats FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  CREATE POLICY "Users can insert their own usage stats"
+    ON usage_stats FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can update their own usage stats"
-  ON usage_stats FOR UPDATE
-  USING (auth.uid() = user_id);
+  CREATE POLICY "Users can update their own usage stats"
+    ON usage_stats FOR UPDATE
+    USING (auth.uid() = user_id);
 ```
 
 ### 4. Create Profile Automatically on Signup

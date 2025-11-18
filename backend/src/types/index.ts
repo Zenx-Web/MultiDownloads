@@ -39,6 +39,7 @@ export interface JobStatus {
   downloadUrl?: string;
   filePath?: string;
   error?: string;
+  metadata?: any; // Additional data for job-specific results
   createdAt: Date;
   updatedAt: Date;
 }

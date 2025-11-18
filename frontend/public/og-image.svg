@@ -1,0 +1,21 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="url(#gradient)"/>
+  
+  <!-- Logo/Icon -->
+  <circle cx="300" cy="315" r="120" fill="white" fill-opacity="0.2"/>
+  <circle cx="300" cy="315" r="90" stroke="white" stroke-width="8" fill="none"/>
+  <path d="M300 255L270 345H330L300 255Z" fill="white"/>
+  <circle cx="300" cy="375" r="12" fill="white"/>
+  
+  <!-- Text -->
+  <text x="450" y="300" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="white">ToolsHub</text>
+  <text x="450" y="370" font-family="Arial, sans-serif" font-size="36" fill="white" fill-opacity="0.9">Free Online Tools for Everyone</text>
+  <text x="450" y="420" font-family="Arial, sans-serif" font-size="28" fill="white" fill-opacity="0.8">29+ Tools • Video Download • File Conversion</text>
+  
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+</svg>

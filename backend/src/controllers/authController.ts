@@ -84,7 +84,7 @@ export const signInHandler = async (req: Request, res: Response) => {
 /**
  * Sign out the current user
  */
-export const signOutHandler = async (req: Request, res: Response) => {
+export const signOutHandler = async (_req: Request, res: Response) => {
   try {
     const result = await authService.signOut();
 
@@ -111,7 +111,7 @@ export const signOutHandler = async (req: Request, res: Response) => {
 /**
  * Get current session
  */
-export const getSessionHandler = async (req: Request, res: Response) => {
+export const getSessionHandler = async (_req: Request, res: Response) => {
   try {
     const result = await authService.getSession();
 
