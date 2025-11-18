@@ -81,6 +81,9 @@ export const downloadYouTubeVideo = async (
     const downloadOptions: string[] = [
       '--progress',
       '--newline',
+      '--no-check-certificate',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      '--extractor-args', 'youtube:player_client=android,web',
       '-o', path.join(config.storage.tempDir, `${outputFilename}.%(ext)s`),
     ];
 
@@ -311,6 +314,9 @@ export const downloadFacebookVideo = async (
     const downloadOptions: string[] = [
       '--progress',
       '--newline',
+      '--no-check-certificate',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      '--extractor-args', 'youtube:player_client=android,web',
       '-o', path.join(config.storage.tempDir, `${outputFilename}.%(ext)s`),
       '-f', 'best',
     ];
