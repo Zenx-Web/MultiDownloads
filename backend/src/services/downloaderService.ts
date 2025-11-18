@@ -8,7 +8,11 @@ import { sanitizeFilename } from './urlService';
 
 // Initialize yt-dlp wrapper with auto-download
 let ytDlpWrap: YTDlpWrap;
-const ytDlpPath = path.join(__dirname, '../../yt-dlp.exe');
+
+// Detect OS and set appropriate binary name
+const isWindows = process.platform === 'win32';
+const ytDlpBinaryName = isWindows ? 'yt-dlp.exe' : 'yt-dlp';
+const ytDlpPath = path.join(__dirname, '../../', ytDlpBinaryName);
 
 // Download yt-dlp binary if not exists
 const ensureYtDlp = async (): Promise<YTDlpWrap> => {
@@ -17,9 +21,15 @@ const ensureYtDlp = async (): Promise<YTDlpWrap> => {
   }
 
   if (!fs.existsSync(ytDlpPath)) {
-    console.log('Downloading yt-dlp binary...');
+    console.log(`Downloading yt-dlp binary for ${process.platform}...`);
     try {
       await YTDlpWrap.downloadFromGithub(ytDlpPath);
+      
+      // Make executable on Unix systems
+      if (!isWindows) {
+        fs.chmodSync(ytDlpPath, '755');
+      }
+      
       console.log('yt-dlp downloaded successfully');
     } catch (error) {
       console.error('Failed to download yt-dlp:', error);
