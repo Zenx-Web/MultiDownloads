@@ -1,0 +1,11 @@
+version: 2
+services:
+  backend:
+    source: backend
+    build:
+      command: npm install && npm run build
+    start:
+      command: npm start
+    env:
+      NODE_ENV: production
+      PORT: 5000
