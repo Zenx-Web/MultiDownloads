@@ -398,15 +398,28 @@ export const getMediaInfo = async (
   const ytDlp = await ensureYtDlp();
   
   try {
-    const info = await ytDlp.getVideoInfo(url);
+    // Use the same bot bypass options as downloads
+    const infoOptions = [
+      '--dump-json',
+      '--no-check-certificate',
+      '--extractor-args', 'youtube:player_client=ios,android',
+      '--extractor-args', 'youtube:skip=hls,dash',
+      '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+      '--add-header', 'Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      '--add-header', 'Accept-Language:en-us,en;q=0.5',
+      '--add-header', 'Sec-Fetch-Mode:navigate',
+    ];
+    
+    const info = await ytDlp.execPromise([url, ...infoOptions]);
+    const parsed = JSON.parse(info);
     
     // Extract relevant information
     return {
-      title: info.title,
-      thumbnail: info.thumbnail,
-      duration: info.duration,
-      uploader: info.uploader || info.channel,
-      formats: info.formats?.map((f: any) => ({
+      title: parsed.title,
+      thumbnail: parsed.thumbnail,
+      duration: parsed.duration,
+      uploader: parsed.uploader || parsed.channel,
+      formats: parsed.formats?.map((f: any) => ({
         formatId: f.format_id,
         ext: f.ext,
         quality: f.format_note || f.quality,
