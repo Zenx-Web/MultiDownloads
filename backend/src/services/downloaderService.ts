@@ -77,13 +77,17 @@ export const downloadYouTubeVideo = async (
       fs.mkdirSync(config.storage.tempDir, { recursive: true });
     }
 
-    // Configure download options
+    // Configure download options with enhanced bot bypass
     const downloadOptions: string[] = [
       '--progress',
       '--newline',
       '--no-check-certificate',
-      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      '--extractor-args', 'youtube:player_client=android,web',
+      '--extractor-args', 'youtube:player_client=ios,android',
+      '--extractor-args', 'youtube:skip=hls,dash',
+      '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+      '--add-header', 'Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      '--add-header', 'Accept-Language:en-us,en;q=0.5',
+      '--add-header', 'Sec-Fetch-Mode:navigate',
       '-o', path.join(config.storage.tempDir, `${outputFilename}.%(ext)s`),
     ];
 
