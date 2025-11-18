@@ -7,6 +7,9 @@ import { AuthProvider } from '@/contexts/AuthContext';
 
 const inter = Inter({ subsets: ['latin'] });
 
+// Force dynamic rendering to avoid build-time Supabase issues
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'ToolsHub - Free Online Tools for Video Download, File Conversion & More',
   description:
