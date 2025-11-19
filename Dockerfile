@@ -16,8 +16,8 @@ COPY backend/ ./
 # Build TypeScript
 RUN npm run build
 
-# Expose port
-EXPOSE 5000
+# Expose the same port the app listens on in production
+EXPOSE 8080
 
 # Start the application
 CMD ["npm", "start"]
