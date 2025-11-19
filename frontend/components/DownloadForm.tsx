@@ -1,12 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 interface DownloadFormProps {
-  onJobCreated: (jobId: string) => void;
+  onJobCreated?: (jobId: string) => void;
+}
+
+interface VideoInfo {
+  title: string;
+  thumbnail: string;
+  duration: number;
+  uploader: string;
+}
+
+interface DownloadState {
+  videoInfo: VideoInfo | null;
+  jobId: string | null;
+  status: 'idle' | 'fetching' | 'processing' | 'ready' | 'downloading';
+  progress: number;
+  error: string | null;
+  downloadUrl: string | null;
 }
 
 export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
@@ -14,47 +30,157 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
   const [quality, setQuality] = useState('720p');
   const [format, setFormat] = useState('mp4');
   const [action, setAction] = useState('download');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [downloadState, setDownloadState] = useState<DownloadState>({
+    videoInfo: null,
+    jobId: null,
+    status: 'idle',
+    progress: 0,
+    error: null,
+    downloadUrl: null,
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!url) {
-      setError('Please enter a URL');
-      return;
+  // Poll job status when processing
+  useEffect(() => {
+    if (downloadState.jobId && downloadState.status === 'processing') {
+      const interval = setInterval(async () => {
+        try {
+          const response = await axios.get(`${API_URL}/status/${downloadState.jobId}`);
+          const job = response.data.data;
+
+          setDownloadState(prev => ({ ...prev, progress: job.progress || 0 }));
+
+          if (job.status === 'completed') {
+            setDownloadState(prev => ({
+              ...prev,
+              status: 'ready',
+              progress: 100,
+              downloadUrl: job.downloadUrl,
+            }));
+            clearInterval(interval);
+          } else if (job.status === 'failed') {
+            setDownloadState(prev => ({
+              ...prev,
+              status: 'idle',
+              error: job.error || 'Download failed',
+            }));
+            clearInterval(interval);
+          }
+        } catch (error) {
+          console.error('Status check error:', error);
+        }
+      }, 1000);
+
+      return () => clearInterval(interval);
     }
+  }, [downloadState.jobId, downloadState.status]);
 
-    setError('');
-    setIsLoading(true);
+  const handleDownloadClick = async () => {
+    // First click: Fetch info and start download
+    if (downloadState.status === 'idle') {
+      if (!url) {
+        setDownloadState(prev => ({ ...prev, error: 'Please enter a URL' }));
+        return;
+      }
 
-    try {
-      const response = await axios.post(`${API_URL}/download`, {
-        url,
-        quality: action === 'audio' ? '720p' : quality,
-        format: action === 'audio' ? 'mp3' : format,
-        action: action === 'audio' ? 'audio-only' : 'download',
-        platform: 'auto',
+      setDownloadState({
+        videoInfo: null,
+        jobId: null,
+        status: 'fetching',
+        progress: 0,
+        error: null,
+        downloadUrl: null,
       });
 
-      if (response.data.success) {
-        onJobCreated(response.data.data.jobId);
-        setUrl('');
-      } else {
-        setError(response.data.error || 'Failed to initiate download');
+      try {
+        // Fetch video info
+        const infoResponse = await axios.post(`${API_URL}/download/info`, { url });
+        
+        if (!infoResponse.data.success) {
+          throw new Error(infoResponse.data.error || 'Failed to fetch video info');
+        }
+
+        const videoInfo = infoResponse.data.data;
+
+        setDownloadState(prev => ({
+          ...prev,
+          videoInfo,
+          status: 'processing',
+          progress: 5,
+        }));
+
+        // Start download process
+        const downloadResponse = await axios.post(`${API_URL}/download`, {
+          url,
+          quality: action === 'audio' ? '720p' : quality,
+          format: action === 'audio' ? 'mp3' : format,
+          action: action === 'audio' ? 'audio-only' : 'download',
+          platform: 'auto',
+        });
+
+        if (!downloadResponse.data.success) {
+          throw new Error(downloadResponse.data.error || 'Failed to start download');
+        }
+
+        const jobId = downloadResponse.data.data.jobId;
+        setDownloadState(prev => ({
+          ...prev,
+          jobId,
+        }));
+
+        if (onJobCreated) {
+          onJobCreated(jobId);
+        }
+
+      } catch (err: any) {
+        const errorMsg = err.response?.data?.error || err.message || 'Failed to process request';
+        setDownloadState({
+          videoInfo: null,
+          jobId: null,
+          status: 'idle',
+          progress: 0,
+          error: errorMsg,
+          downloadUrl: null,
+        });
+        console.error('Download error:', err);
       }
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.error || err.response?.data?.message || 'Failed to connect to server';
-      setError(errorMsg);
-      console.error('Download error:', err.response?.data);
-    } finally {
-      setIsLoading(false);
+    }
+    // Second click: Download the file
+    else if (downloadState.status === 'ready' && downloadState.downloadUrl) {
+      window.location.href = `${API_URL}${downloadState.downloadUrl}`;
+      
+      // Reset after a delay
+      setTimeout(() => {
+        setDownloadState({
+          videoInfo: null,
+          jobId: null,
+          status: 'idle',
+          progress: 0,
+          error: null,
+          downloadUrl: null,
+        });
+        setUrl('');
+      }, 2000);
     }
   };
 
+  const getButtonText = () => {
+    switch (downloadState.status) {
+      case 'fetching':
+        return 'Fetching video info...';
+      case 'processing':
+        return `Processing... ${downloadState.progress}%`;
+      case 'ready':
+        return '⬇️ Download Ready - Click to Save';
+      default:
+        return action === 'audio' ? '🎵 Download Audio (MP3)' : '⬇️ Download Video';
+    }
+  };
+
+  const isButtonDisabled = downloadState.status === 'fetching' || downloadState.status === 'processing';
+
   return (
     <div className="bg-white rounded-lg shadow-xl p-8">
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-6">
         {/* URL Input */}
         <div>
           <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-2">
@@ -65,11 +191,51 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
             id="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
+            disabled={downloadState.status !== 'idle'}
             placeholder="https://www.youtube.com/watch?v=..."
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             required
           />
         </div>
+
+        {/* Video Info Display */}
+        {downloadState.videoInfo && (
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-200 animate-fadeIn">
+            <div className="flex gap-4">
+              {downloadState.videoInfo.thumbnail && (
+                <img
+                  src={downloadState.videoInfo.thumbnail}
+                  alt={downloadState.videoInfo.title}
+                  className="w-32 h-24 object-cover rounded shadow-md"
+                />
+              )}
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">{downloadState.videoInfo.title}</h3>
+                {downloadState.videoInfo.uploader && (
+                  <p className="text-sm text-gray-600 mb-1">By {downloadState.videoInfo.uploader}</p>
+                )}
+                {downloadState.videoInfo.duration && (
+                  <p className="text-sm text-gray-500">
+                    Duration: {Math.floor(downloadState.videoInfo.duration / 60)}:{String(downloadState.videoInfo.duration % 60).padStart(2, '0')}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            {/* Progress Bar */}
+            {downloadState.status === 'processing' && (
+              <div className="mt-4">
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div 
+                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                    style={{ width: `${downloadState.progress}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-600 mt-1 text-center">Processing your download...</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Action Selection */}
         <div>
@@ -78,11 +244,12 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
             <button
               type="button"
               onClick={() => setAction('download')}
+              disabled={downloadState.status !== 'idle'}
               className={`p-4 rounded-lg border-2 transition-all ${
                 action === 'download'
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 hover:border-gray-300'
-              }`}
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               <div className="text-2xl mb-2">📹</div>
               <div className="font-semibold">Download Video</div>
@@ -90,11 +257,12 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
             <button
               type="button"
               onClick={() => setAction('audio')}
+              disabled={downloadState.status !== 'idle'}
               className={`p-4 rounded-lg border-2 transition-all ${
                 action === 'audio'
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 hover:border-gray-300'
-              }`}
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               <div className="text-2xl mb-2">🎵</div>
               <div className="font-semibold">Extract Audio (MP3)</div>
@@ -113,7 +281,8 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
                 id="quality"
                 value={quality}
                 onChange={(e) => setQuality(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={downloadState.status !== 'idle'}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
               >
                 <option value="360p">360p</option>
                 <option value="480p">480p</option>
@@ -130,7 +299,8 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
                 id="format"
                 value={format}
                 onChange={(e) => setFormat(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={downloadState.status !== 'idle'}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
               >
                 <option value="mp4">MP4</option>
                 <option value="webm">WebM</option>
@@ -141,19 +311,23 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
         )}
 
         {/* Error Message */}
-        {error && (
+        {downloadState.error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            {error}
+            {downloadState.error}
           </div>
         )}
 
-        {/* Submit Button */}
+        {/* Download Button */}
         <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed text-lg"
+          onClick={handleDownloadClick}
+          disabled={isButtonDisabled}
+          className={`w-full py-4 rounded-lg font-semibold transition-all text-lg ${
+            downloadState.status === 'ready'
+              ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse'
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
+          } disabled:bg-gray-400 disabled:cursor-not-allowed`}
         >
-          {isLoading ? (
+          {isButtonDisabled ? (
             <span className="flex items-center justify-center">
               <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
                 <circle
@@ -171,12 +345,10 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 />
               </svg>
-              Starting Download...
+              {getButtonText()}
             </span>
           ) : (
-            <>
-              {action === 'audio' ? '🎵 Download Audio (MP3)' : '⬇️ Download Video'}
-            </>
+            getButtonText()
           )}
         </button>
 
@@ -187,7 +359,7 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
             Upgrade for unlimited access
           </a>
         </p>
-      </form>
+      </div>
     </div>
   );
 }
