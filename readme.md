@@ -1,6 +1,200 @@
-# 🚀 MultiDownloader - Download & Convert Media
+# 🚀 MultiDownloads - All-in-One Media Tool
 
-A powerful web application for downloading videos from multiple platforms (YouTube, Instagram, Facebook, TikTok) and converting media files (video, audio, images) to various formats.
+A powerful web application for downloading videos, converting media, and using various utility tools.
+
+## ✨ Features
+
+### 📥 Downloaders
+- ✅ YouTube Video Downloader (with quality selection)
+- ✅ YouTube Music Downloader
+- ✅ Instagram Downloader
+- ✅ Facebook Video Downloader
+
+### 🔄 Converters
+- 🎬 Video Converter (MP4, AVI, MOV, MKV)
+- 🎵 Audio Converter (MP3, WAV, AAC, FLAC, OGG)
+- 🖼️ Image Converter (JPG, PNG, WebP, AVIF, GIF, BMP)
+
+### 🛠️ Utility Tools
+- 📱 QR Code Generator
+- 🎨 Color Palette Extractor
+- 🔐 Hash Generator
+- 🖼️ Image Compressor & Resizer
+- 📄 PDF Tools (Merge, Split, Convert)
+- 🎤 Text to Speech
+- 📸 Screenshot Tool
+- 🖌️ Watermark Tool
+- 🎯 Favicon Generator
+- ✂️ Background Remover
+- And more...
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Framework:** Next.js 14 (App Router)
+- **Styling:** Tailwind CSS
+- **Deployment:** Vercel
+- **State Management:** React Hooks
+
+### Backend
+- **Runtime:** Node.js + TypeScript
+- **Framework:** Express
+- **Media Processing:** FFmpeg, yt-dlp
+- **Deployment:** Fly.io
+- **Storage:** Supabase (optional)
+
+## 📦 Project Structure
+
+```
+multidowload tool/
+├── frontend/                 # Next.js frontend
+│   ├── app/                 # App router pages
+│   ├── components/          # React components
+│   └── public/              # Static assets
+├── backend/                 # Express backend
+│   ├── src/
+│   │   ├── controllers/    # Route controllers
+│   │   ├── services/       # Business logic
+│   │   ├── middlewares/    # Express middlewares
+│   │   └── routes/         # API routes
+│   └── temp/               # Temporary file storage
+├── Dockerfile              # Docker configuration for Fly.io
+├── fly.toml                # Fly.io deployment config
+└── .dockerignore          # Docker ignore file
+```
+
+## 🚀 Deployment
+
+### Backend (Fly.io)
+
+**Prerequisites:**
+- Fly.io account (https://fly.io)
+- Fly CLI installed
+
+**Installation:**
+```powershell
+# Install Fly CLI (Windows)
+iwr https://fly.io/install.ps1 -useb | iex
+
+# Login
+fly auth login
+
+# Deploy
+cd "c:\Users\Maac Panbazar\Desktop\multidowload tool"
+fly launch --no-deploy
+
+# Set secrets
+fly secrets set YOUTUBE_COOKIES="your-cookies"
+fly secrets set SUPABASE_URL="your-url"
+fly secrets set SUPABASE_ANON_KEY="your-key"
+fly secrets set CORS_ORIGIN="https://multidownloads.vercel.app"
+
+# Deploy
+fly deploy
+```
+
+**Your API:** `https://multidownloads-backend.fly.dev/api`
+
+For detailed instructions, see [.fly/deploy.md](.fly/deploy.md)
+
+### Frontend (Vercel)
+
+1. **Update `.env.local`:**
+```env
+NEXT_PUBLIC_API_URL=https://multidownloads-backend.fly.dev/api
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-key
+```
+
+2. **Deploy:**
+- Connect GitHub repo to Vercel
+- Auto-deploys on push to main branch
+
+## 🔧 Local Development
+
+### Backend
+```bash
+cd backend
+npm install
+npm run dev  # http://localhost:5000
+```
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev  # http://localhost:3000
+```
+
+## 🌐 Environment Variables
+
+### Backend (.env)
+```env
+PORT=5000
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:3000
+YOUTUBE_COOKIES=your-youtube-cookies
+SUPABASE_URL=your-supabase-url
+SUPABASE_ANON_KEY=your-key
+```
+
+### Frontend (.env.local)
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000/api
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-key
+```
+
+## 📝 API Endpoints
+
+### Core
+- `GET /` - API information
+- `GET /api/health` - Health check
+
+### Downloads
+- `POST /api/download` - Start download
+- `GET /api/status/:jobId` - Job status
+- `GET /api/download/file/:jobId` - Download file
+
+### Conversions
+- `POST /api/convert/video` - Convert video
+- `POST /api/convert/audio` - Convert audio
+- `POST /api/convert/image` - Convert image
+
+## 🔒 Features
+
+- ✅ Two-click download system (fetch info → download)
+- ✅ Job polling with progress updates
+- ✅ Quality selection for videos
+- ✅ Format conversion
+- ✅ Rate limiting
+- ✅ CORS protection
+- ✅ Health checks
+
+## 🤝 Contributing
+
+Contributions welcome! Please:
+1. Fork the repository
+2. Create feature branch
+3. Commit changes
+4. Push and open PR
+
+## 📄 License
+
+MIT License - Free for personal and commercial use
+
+## 🙏 Credits
+
+- **FFmpeg** - Media processing
+- **yt-dlp** - Video downloading
+- **Fly.io** - Backend hosting
+- **Vercel** - Frontend deployment
+- **Next.js** - React framework
+- **Tailwind CSS** - Styling
+
+---
+
+Made with ❤️ by Zenx-Web
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)

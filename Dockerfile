@@ -1,4 +1,4 @@
-# Use Node.js LTS with FFmpeg support
+# Use Node.js LTS with FFmpeg support for Fly.io
 FROM node:20-bullseye-slim
 
 # Install FFmpeg and Python for yt-dlp
@@ -30,14 +30,13 @@ RUN npm prune --production
 # Create temp directory
 RUN mkdir -p /app/temp && chmod 777 /app/temp
 
-# Railway dynamically assigns PORT
+# Fly.io will use internal_port from fly.toml
 EXPOSE 8080
 
 # Set environment to production
 ENV NODE_ENV=production
-ENV PORT=8080
 
-# Health check
+# Health check for Fly.io
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:8080/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
