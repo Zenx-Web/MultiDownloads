@@ -146,7 +146,9 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
     }
     // Second click: Download the file
     else if (downloadState.status === 'ready' && downloadState.downloadUrl) {
-      window.location.href = `${API_URL}${downloadState.downloadUrl}`;
+      // Remove /api prefix from downloadUrl since API_URL already includes it
+      const cleanUrl = downloadState.downloadUrl.replace(/^\/api/, '');
+      window.location.href = `${API_URL}${cleanUrl}`;
       
       // Reset after a delay
       setTimeout(() => {
