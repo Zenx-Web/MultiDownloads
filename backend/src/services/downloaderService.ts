@@ -396,14 +396,16 @@ export const getMediaInfo = async (
   const ytDlp = await ensureYtDlp();
   
   try {
-    // Use the same bot bypass options as downloads
+    // Use the same bot bypass options as downloads with additional proxying
     const infoOptions = [
       '--dump-json',
       '--no-check-certificate',
       '--no-warnings',
-      '--extractor-args', 'youtube:player_client=ios',
+      '--extractor-args', 'youtube:player_client=ios,web',
       '--extractor-args', 'youtube:skip=translated_subs',
       '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+      '--geo-bypass',
+      '--force-ipv4',
     ];
     
     const info = await ytDlp.execPromise([url, ...infoOptions]);
