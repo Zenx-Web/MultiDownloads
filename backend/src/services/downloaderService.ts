@@ -42,6 +42,31 @@ const ensureYtDlp = async (): Promise<YTDlpWrap> => {
 };
 
 /**
+ * Ensure cookies are available for YouTube downloads
+ */
+const ensureCookies = (): { hasCookies: boolean; cookiesPath: string } => {
+  const cookiesPath = path.join(__dirname, '../../cookies.txt');
+  let hasCookies = fs.existsSync(cookiesPath);
+  
+  // If no file, try to create from environment variable
+  if (!hasCookies && process.env.YOUTUBE_COOKIES) {
+    try {
+      fs.writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES);
+      hasCookies = true;
+      console.log('✓ Created cookies.txt from YOUTUBE_COOKIES environment variable');
+    } catch (error) {
+      console.warn('✗ Failed to write cookies from env:', error);
+    }
+  } else if (hasCookies) {
+    console.log('✓ Using existing cookies.txt file');
+  } else {
+    console.warn('⚠ No YouTube cookies available - may encounter bot detection');
+  }
+  
+  return { hasCookies, cookiesPath };
+};
+
+/**
  * Download video from YouTube using yt-dlp
  */
 export const downloadYouTubeVideo = async (
@@ -64,32 +89,40 @@ export const downloadYouTubeVideo = async (
     // Initialize yt-dlp with auto-download
     const ytDlp = await ensureYtDlp();
     
-    // Get video info
-    const info = await ytDlp.getVideoInfo(url);
-    const title = sanitizeFilename(info.title || 'video');
-    const outputFilename = `${jobId}_${title}`;
-    const outputPath = path.join(config.storage.tempDir, `${outputFilename}.${format}`);
-
-    updateJob(jobId, { progress: 20, message: `Downloading: ${info.title?.substring(0, 50) || 'video'}...` });
-
     // Ensure temp directory exists
     if (!fs.existsSync(config.storage.tempDir)) {
       fs.mkdirSync(config.storage.tempDir, { recursive: true });
     }
 
-    // Check if cookies file exists or use env variable
-    const cookiesPath = path.join(__dirname, '../../cookies.txt');
-    let hasCookies = fs.existsSync(cookiesPath);
+    // Setup cookies for YouTube
+    const { hasCookies, cookiesPath } = ensureCookies();
+
+    // Get video info with bypass options
+    updateJob(jobId, { progress: 15, message: 'Fetching video information...' });
     
-    // If no file, try to create from environment variable
-    if (!hasCookies && process.env.YOUTUBE_COOKIES) {
-      try {
-        fs.writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES);
-        hasCookies = true;
-      } catch (error) {
-        console.warn('Failed to write cookies from env:', error);
-      }
+    const infoOptions = [
+      '--dump-json',
+      '--no-check-certificate',
+      '--no-warnings',
+      '--extractor-args', 'youtube:player_client=ios,web',
+      '--extractor-args', 'youtube:skip=translated_subs',
+      '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+      '--geo-bypass',
+      '--force-ipv4',
+    ];
+    
+    if (hasCookies) {
+      infoOptions.push('--cookies', cookiesPath);
     }
+    
+    const infoJson = await ytDlp.execPromise([url, ...infoOptions]);
+    const info = JSON.parse(infoJson);
+    
+    const title = sanitizeFilename(info.title || 'video');
+    const outputFilename = `${jobId}_${title}`;
+    const outputPath = path.join(config.storage.tempDir, `${outputFilename}.${format}`);
+
+    updateJob(jobId, { progress: 20, message: `Downloading: ${info.title?.substring(0, 50) || 'video'}...` });
 
     // Configure download options with enhanced bot bypass
     const downloadOptions: string[] = [
@@ -419,20 +452,6 @@ export const getMediaInfo = async (
   const ytDlp = await ensureYtDlp();
   
   try {
-    // Check if cookies file exists or use env variable
-    const cookiesPath = path.join(__dirname, '../../cookies.txt');
-    let hasCookies = fs.existsSync(cookiesPath);
-    
-    // If no file, try to create from environment variable
-    if (!hasCookies && process.env.YOUTUBE_COOKIES) {
-      try {
-        fs.writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES);
-        hasCookies = true;
-      } catch (error) {
-        console.warn('Failed to write cookies from env:', error);
-      }
-    }
-
     // Use appropriate bot bypass options based on URL
     const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
     
@@ -444,6 +463,8 @@ export const getMediaInfo = async (
 
     // Add platform-specific options
     if (isYouTube) {
+      const { hasCookies, cookiesPath } = ensureCookies();
+      
       infoOptions.push(
         '--extractor-args', 'youtube:player_client=ios,web',
         '--extractor-args', 'youtube:skip=translated_subs',
