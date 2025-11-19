@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     python3 \
     python3-pip \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -15,19 +16,30 @@ WORKDIR /app
 COPY backend/package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci --only=production && npm cache clean --force
 
-# Copy ALL backend source files (including latest changes)
+# Copy ALL backend source files
 COPY backend/ ./
 
-# Build TypeScript from latest source
-RUN npm run build
+# Build TypeScript
+RUN npm install typescript @types/node --save-dev && npm run build
 
-# Railway dynamically assigns PORT - don't hardcode
-EXPOSE ${PORT:-8080}
+# Remove dev dependencies after build
+RUN npm prune --production
+
+# Create temp directory
+RUN mkdir -p /app/temp && chmod 777 /app/temp
+
+# Railway dynamically assigns PORT
+EXPOSE 8080
 
 # Set environment to production
 ENV NODE_ENV=production
+ENV PORT=8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:8080/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start the application
 CMD ["node", "dist/index.js"]
