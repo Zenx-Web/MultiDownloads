@@ -20,6 +20,9 @@ npm-debug.log*
 temp/
 *.tmp
 
+# Cookies (sensitive)
+cookies.txt
+
 # OS
 .DS_Store
 Thumbs.db

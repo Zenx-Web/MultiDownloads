@@ -77,6 +77,10 @@ export const downloadYouTubeVideo = async (
       fs.mkdirSync(config.storage.tempDir, { recursive: true });
     }
 
+    // Check if cookies file exists
+    const cookiesPath = path.join(__dirname, '../../cookies.txt');
+    const hasCookies = fs.existsSync(cookiesPath);
+
     // Configure download options with enhanced bot bypass
     const downloadOptions: string[] = [
       '--progress',
@@ -92,6 +96,11 @@ export const downloadYouTubeVideo = async (
       '--extractor-retries', '5',
       '-o', path.join(config.storage.tempDir, `${outputFilename}.%(ext)s`),
     ];
+
+    // Add cookies if available
+    if (hasCookies) {
+      downloadOptions.push('--cookies', cookiesPath);
+    }
 
     if (format === 'mp3') {
       // Extract audio only
@@ -400,6 +409,10 @@ export const getMediaInfo = async (
   const ytDlp = await ensureYtDlp();
   
   try {
+    // Check if cookies file exists
+    const cookiesPath = path.join(__dirname, '../../cookies.txt');
+    const hasCookies = fs.existsSync(cookiesPath);
+
     // Use the same bot bypass options as downloads with additional proxying
     const infoOptions = [
       '--dump-json',
@@ -411,6 +424,11 @@ export const getMediaInfo = async (
       '--geo-bypass',
       '--force-ipv4',
     ];
+
+    // Add cookies if available
+    if (hasCookies) {
+      infoOptions.push('--cookies', cookiesPath);
+    }
     
     const info = await ytDlp.execPromise([url, ...infoOptions]);
     const parsed = JSON.parse(info);
