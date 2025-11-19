@@ -34,7 +34,19 @@ export const getVideoInfo = async (
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new ApiError(500, `Failed to fetch video info: ${(error as Error).message}`);
+    
+    const errorMessage = (error as Error).message;
+    
+    // Check for YouTube bot detection
+    if (errorMessage.includes('Sign in to confirm') || errorMessage.includes('not a bot')) {
+      return res.status(403).json({
+        success: false,
+        error: 'YouTube bot detection triggered',
+        message: 'This video requires fresh authentication cookies. Please try a different video or contact support.',
+      });
+    }
+    
+    throw new ApiError(500, `Failed to fetch video info: ${errorMessage}`);
   }
 };
 
