@@ -340,8 +340,8 @@ export const downloadFacebookVideo = async (
       '--progress',
       '--newline',
       '--no-check-certificate',
+      '--no-warnings',
       '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      '--extractor-args', 'youtube:player_client=android,web',
       '-o', path.join(config.storage.tempDir, `${outputFilename}.%(ext)s`),
       '-f', 'best',
     ];
@@ -433,21 +433,34 @@ export const getMediaInfo = async (
       }
     }
 
-    // Use the same bot bypass options as downloads with additional proxying
+    // Use appropriate bot bypass options based on URL
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+    
     const infoOptions = [
       '--dump-json',
       '--no-check-certificate',
       '--no-warnings',
-      '--extractor-args', 'youtube:player_client=ios,web',
-      '--extractor-args', 'youtube:skip=translated_subs',
-      '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
-      '--geo-bypass',
-      '--force-ipv4',
     ];
 
-    // Add cookies if available
-    if (hasCookies) {
-      infoOptions.push('--cookies', cookiesPath);
+    // Add platform-specific options
+    if (isYouTube) {
+      infoOptions.push(
+        '--extractor-args', 'youtube:player_client=ios,web',
+        '--extractor-args', 'youtube:skip=translated_subs',
+        '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+        '--geo-bypass',
+        '--force-ipv4'
+      );
+      
+      // Add cookies if available for YouTube
+      if (hasCookies) {
+        infoOptions.push('--cookies', cookiesPath);
+      }
+    } else {
+      // For other platforms (Facebook, Instagram), use generic user agent
+      infoOptions.push(
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      );
     }
     
     const info = await ytDlp.execPromise([url, ...infoOptions]);
