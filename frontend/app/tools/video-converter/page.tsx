@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -9,15 +9,47 @@ export default function VideoConverterPage() {
   const [file, setFile] = useState<File | null>(null);
   const [targetFormat, setTargetFormat] = useState('mp4');
   const [targetQuality, setTargetQuality] = useState('720');
-  const [isConverting, setIsConverting] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [status, setStatus] = useState<'idle' | 'converting' | 'ready'>('idle');
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
   const [downloadUrl, setDownloadUrl] = useState('');
+
+  // Poll job status
+  useEffect(() => {
+    if (jobId && status === 'converting') {
+      const interval = setInterval(async () => {
+        try {
+          const response = await axios.get(`${API_URL}/status/${jobId}`);
+          const job = response.data.data;
+
+          setProgress(job.progress || 0);
+
+          if (job.status === 'completed') {
+            setStatus('ready');
+            setDownloadUrl(job.downloadUrl);
+            clearInterval(interval);
+          } else if (job.status === 'failed') {
+            setStatus('idle');
+            setError(job.error || 'Conversion failed');
+            clearInterval(interval);
+          }
+        } catch (error) {
+          console.error('Status check error:', error);
+        }
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [jobId, status]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       setError('');
       setDownloadUrl('');
+      setStatus('idle');
+      setJobId(null);
     }
   };
 
@@ -27,8 +59,9 @@ export default function VideoConverterPage() {
       return;
     }
 
-    setIsConverting(true);
+    setStatus('converting');
     setError('');
+    setProgress(0);
 
     const formData = new FormData();
     formData.append('video', file);
@@ -41,12 +74,28 @@ export default function VideoConverterPage() {
       });
 
       if (response.data.success) {
-        setDownloadUrl(response.data.downloadUrl);
+        setJobId(response.data.data.jobId);
+      } else {
+        throw new Error(response.data.error || 'Conversion failed');
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Conversion failed');
-    } finally {
-      setIsConverting(false);
+      setError(err.response?.data?.error || err.message || 'Conversion failed');
+      setStatus('idle');
+    }
+  };
+
+  const handleDownload = () => {
+    if (downloadUrl) {
+      const cleanUrl = downloadUrl.replace(/^\/api/, '');
+      window.location.href = `${API_URL}${cleanUrl}`;
+      
+      setTimeout(() => {
+        setStatus('idle');
+        setFile(null);
+        setDownloadUrl('');
+        setJobId(null);
+        setProgress(0);
+      }, 2000);
     }
   };
 
@@ -133,23 +182,43 @@ export default function VideoConverterPage() {
 
             {/* Convert Button */}
             <button
-              onClick={handleConvert}
-              disabled={!file || isConverting}
-              className="w-full bg-purple-600 text-white py-4 rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+              onClick={status === 'ready' ? handleDownload : handleConvert}
+              disabled={!file || status === 'converting'}
+              className={`w-full py-4 rounded-lg font-semibold transition-colors text-lg ${
+                status === 'ready'
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-purple-600 hover:bg-purple-700 text-white'
+              } disabled:bg-gray-400 disabled:cursor-not-allowed`}
             >
-              {isConverting ? 'Converting...' : 'Convert Video'}
+              {status === 'converting' ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Converting... {progress}%
+                </span>
+              ) : status === 'ready' ? (
+                '⬇️ Download Converted Video'
+              ) : (
+                'Convert Video'
+              )}
             </button>
 
+            {/* Progress Bar */}
+            {status === 'converting' && (
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className="bg-purple-600 h-2.5 rounded-full transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+            )}
+
             {/* Download Link */}
-            {downloadUrl && (
-              <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                <p className="text-green-700 mb-2">Conversion complete!</p>
-                <a
-                  href={`${API_URL}${downloadUrl}`}
-                  className="inline-block bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Download Converted Video
-                </a>
+            {downloadUrl && status === 'ready' && (
+              <div className="bg-green-50 border border-green-200 p-4 rounded-lg text-center">
+                <p className="text-green-700 font-semibold">✓ Conversion complete! Click the button above to download.</p>
               </div>
             )}
           </div>
