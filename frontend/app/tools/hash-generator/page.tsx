@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 export default function HashGeneratorPage() {
   const [text, setText] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -27,7 +29,7 @@ export default function HashGeneratorPage() {
     formData.append('algorithm', algorithm);
 
     try {
-      const response = await fetch('http://localhost:5000/api/utility/hash', {
+      const response = await fetch(`${API_URL}/utility/hash`, {
         method: 'POST',
         body: formData,
       });
@@ -40,7 +42,7 @@ export default function HashGeneratorPage() {
 
       const jobId = data.jobId;
       const pollInterval = setInterval(async () => {
-        const statusResponse = await fetch(`http://localhost:5000/api/job/${jobId}`);
+        const statusResponse = await fetch(`${API_URL}/job/${jobId}`);
         const statusData = await statusResponse.json();
 
         if (statusData.status === 'completed') {

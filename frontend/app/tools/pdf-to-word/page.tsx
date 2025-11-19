@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 export default function PdfToWordPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,7 +33,7 @@ export default function PdfToWordPage() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:5000/api/document/pdf-to-docx', {
+      const response = await fetch(`${API_URL}/document/pdf-to-docx`, {
         method: 'POST',
         body: formData,
       });
@@ -45,12 +47,15 @@ export default function PdfToWordPage() {
       // Poll for job status
       const jobId = data.jobId;
       const pollInterval = setInterval(async () => {
-        const statusResponse = await fetch(`http://localhost:5000/api/job/${jobId}`);
+        const statusResponse = await fetch(`${API_URL}/job/${jobId}`);
         const statusData = await statusResponse.json();
 
         if (statusData.status === 'completed') {
           clearInterval(pollInterval);
-          setDownloadUrl(statusData.downloadUrl);
+          const fullUrl = statusData.downloadUrl.startsWith('http') 
+            ? statusData.downloadUrl 
+            : `${API_URL}${statusData.downloadUrl}`;
+          setDownloadUrl(fullUrl);
           setLoading(false);
         } else if (statusData.status === 'failed') {
           clearInterval(pollInterval);

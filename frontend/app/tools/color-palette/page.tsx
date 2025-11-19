@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 export default function ColorPalettePage() {
   const [file, setFile] = useState<File | null>(null);
   const [colorCount, setColorCount] = useState(5);
@@ -36,7 +38,7 @@ export default function ColorPalettePage() {
     formData.append('colorCount', colorCount.toString());
 
     try {
-      const response = await fetch('http://localhost:5000/api/utility/color-palette', {
+      const response = await fetch(`${API_URL}/utility/color-palette`, {
         method: 'POST',
         body: formData,
       });
@@ -45,13 +47,16 @@ export default function ColorPalettePage() {
       const jobId = data.jobId;
 
       const pollInterval = setInterval(async () => {
-        const statusResponse = await fetch(`http://localhost:5000/api/job/${jobId}`);
+        const statusResponse = await fetch(`${API_URL}/job/${jobId}`);
         const statusData = await statusResponse.json();
 
         if (statusData.status === 'completed') {
           clearInterval(pollInterval);
           setColors(statusData.metadata?.colors || []);
-          setPaletteUrl(statusData.downloadUrl);
+          const fullUrl = statusData.downloadUrl.startsWith('http') 
+            ? statusData.downloadUrl 
+            : `${API_URL}${statusData.downloadUrl}`;
+          setPaletteUrl(fullUrl);
           setLoading(false);
         } else if (statusData.status === 'failed') {
           clearInterval(pollInterval);

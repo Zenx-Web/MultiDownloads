@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 export default function VideoTrimmerPage() {
   const [file, setFile] = useState<File | null>(null);
   const [startTime, setStartTime] = useState('00:00:00');
@@ -27,7 +29,7 @@ export default function VideoTrimmerPage() {
     formData.append('endTime', endTime);
 
     try {
-      const response = await fetch('http://localhost:5000/api/media/trim-video', {
+      const response = await fetch(`${API_URL}/media/trim-video`, {
         method: 'POST',
         body: formData,
       });
@@ -36,12 +38,15 @@ export default function VideoTrimmerPage() {
       const jobId = data.jobId;
 
       const pollInterval = setInterval(async () => {
-        const statusResponse = await fetch(`http://localhost:5000/api/job/${jobId}`);
+        const statusResponse = await fetch(`${API_URL}/job/${jobId}`);
         const statusData = await statusResponse.json();
 
         if (statusData.status === 'completed') {
           clearInterval(pollInterval);
-          setDownloadUrl(statusData.downloadUrl);
+          const fullUrl = statusData.downloadUrl.startsWith('http') 
+            ? statusData.downloadUrl 
+            : `${API_URL}${statusData.downloadUrl}`;
+          setDownloadUrl(fullUrl);
           setLoading(false);
         } else if (statusData.status === 'failed') {
           clearInterval(pollInterval);

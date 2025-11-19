@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 export default function TextFormatterPage() {
   const [text, setText] = useState('');
   const [operation, setOperation] = useState('uppercase');
@@ -13,7 +15,7 @@ export default function TextFormatterPage() {
     if (!text) return;
 
     try {
-      const response = await fetch('http://localhost:5000/api/utility/format-text', {
+      const response = await fetch(`${API_URL}/utility/format-text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, operation }),
@@ -23,7 +25,7 @@ export default function TextFormatterPage() {
       const jobId = data.jobId;
 
       const pollInterval = setInterval(async () => {
-        const statusResponse = await fetch(`http://localhost:5000/api/job/${jobId}`);
+        const statusResponse = await fetch(`${API_URL}/job/${jobId}`);
         const statusData = await statusResponse.json();
 
         if (statusData.status === 'completed') {
