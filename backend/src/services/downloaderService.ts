@@ -78,8 +78,8 @@ export const downloadYouTubeVideo = async (
   try {
     updateJob(jobId, { progress: 5, status: 'processing', message: 'Validating YouTube URL...' });
 
-    // Basic YouTube URL validation
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
+    // Basic YouTube URL validation (includes YouTube Music)
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|music\.youtube\.com)\/.+$/;
     if (!youtubeRegex.test(url)) {
       throw new Error('Invalid YouTube URL');
     }
@@ -453,7 +453,7 @@ export const getMediaInfo = async (
   
   try {
     // Use appropriate bot bypass options based on URL
-    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be') || url.includes('music.youtube.com');
     
     const infoOptions = [
       '--dump-json',

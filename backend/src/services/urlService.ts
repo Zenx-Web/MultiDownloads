@@ -9,7 +9,8 @@ export const detectPlatform = (url: string): Platform => {
   if (
     urlLower.includes('youtube.com') ||
     urlLower.includes('youtu.be') ||
-    urlLower.includes('youtube-nocookie.com')
+    urlLower.includes('youtube-nocookie.com') ||
+    urlLower.includes('music.youtube.com')
   ) {
     return Platform.YOUTUBE;
   }
