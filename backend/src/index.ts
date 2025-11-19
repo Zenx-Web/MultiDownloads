@@ -75,14 +75,32 @@ app.use(errorHandler);
 const PORT = config.port;
 const HOST = '0.0.0.0'; // Bind to all interfaces for Railway
 
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log('=================================');
   console.log(`🚀 MultiDownloader API Server`);
   console.log(`📡 Environment: ${config.nodeEnv}`);
   console.log(`🌐 Port: ${PORT}`);
+  console.log(`🌐 Host: ${HOST}`);
   console.log(`🔗 URL: http://localhost:${PORT}`);
   console.log(`📁 Temp storage: ${config.storage.tempDir}`);
   console.log('=================================');
+  
+  // Log successful binding
+  const address = server.address();
+  if (address && typeof address === 'object') {
+    console.log(`✅ Server is listening on ${address.address}:${address.port}`);
+  }
+});
+
+server.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use`);
+  } else if (error.code === 'EACCES') {
+    console.error(`❌ Permission denied to bind to port ${PORT}`);
+  } else {
+    console.error('❌ Server error:', error);
+  }
+  process.exit(1);
 });
 
 export default app;
