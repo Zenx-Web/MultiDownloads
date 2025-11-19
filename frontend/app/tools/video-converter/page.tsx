@@ -115,113 +115,29 @@ export default function VideoConverterPage() {
           </p>
         </div>
 
-        {/* Converter Form */}
-        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-8">
-          <div className="space-y-6">
-            {/* File Upload */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Video File
-              </label>
-              <input
-                type="file"
-                accept="video/*"
-                onChange={handleFileChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-              {file && (
-                <p className="mt-2 text-sm text-gray-600">
-                  Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                </p>
-              )}
-            </div>
-
-            {/* Format Selection */}
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Target Format
-                </label>
-                <select
-                  value={targetFormat}
-                  onChange={(e) => setTargetFormat(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="mp4">MP4</option>
-                  <option value="avi">AVI</option>
-                  <option value="mkv">MKV</option>
-                  <option value="webm">WebM</option>
-                  <option value="mov">MOV</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Quality
-                </label>
-                <select
-                  value={targetQuality}
-                  onChange={(e) => setTargetQuality(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="480">480p</option>
-                  <option value="720">720p HD</option>
-                  <option value="1080">1080p Full HD</option>
-                  <option value="1440">1440p 2K</option>
-                  <option value="2160">2160p 4K</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                {error}
-              </div>
-            )}
-
-            {/* Convert Button */}
-            <button
-              onClick={status === 'ready' ? handleDownload : handleConvert}
-              disabled={!file || status === 'converting'}
-              className={`w-full py-4 rounded-lg font-semibold transition-colors text-lg ${
-                status === 'ready'
-                  ? 'bg-green-600 hover:bg-green-700 text-white'
-                  : 'bg-purple-600 hover:bg-purple-700 text-white'
-              } disabled:bg-gray-400 disabled:cursor-not-allowed`}
-            >
-              {status === 'converting' ? (
-                <span className="flex items-center justify-center">
-                  <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Converting... {progress}%
-                </span>
-              ) : status === 'ready' ? (
-                '⬇️ Download Converted Video'
-              ) : (
-                'Convert Video'
-              )}
-            </button>
-
-            {/* Progress Bar */}
-            {status === 'converting' && (
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div 
-                  className="bg-purple-600 h-2.5 rounded-full transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                ></div>
-              </div>
-            )}
-
-            {/* Download Link */}
-            {downloadUrl && status === 'ready' && (
-              <div className="bg-green-50 border border-green-200 p-4 rounded-lg text-center">
-                <p className="text-green-700 font-semibold">✓ Conversion complete! Click the button above to download.</p>
-              </div>
-            )}
+        {/* Coming Soon Notice */}
+        <div className="max-w-2xl mx-auto bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg shadow-xl p-12 text-center">
+          <div className="text-6xl mb-6">🎬</div>
+          <h2 className="text-3xl font-bold mb-4 text-purple-900">Video Converter Coming Soon!</h2>
+          <p className="text-lg text-gray-700 mb-6">
+            We're working on bringing you a powerful video converter with client-side processing. 
+            This feature will be available soon!
+          </p>
+          <div className="bg-white/50 rounded-lg p-6">
+            <h3 className="font-semibold text-gray-800 mb-3">Meanwhile, you can use:</h3>
+            <ul className="text-left space-y-2 text-gray-700">
+              <li>✅ YouTube Video Downloader (MP4/MP3)</li>
+              <li>✅ Instagram Video Downloader</li>
+              <li>✅ Facebook Video Downloader</li>
+              <li>✅ Image Tools (QR Generator, Resizer, Compressor)</li>
+            </ul>
           </div>
+          <a
+            href="/"
+            className="inline-block mt-8 bg-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
+          >
+            Go to Home
+          </a>
         </div>
 
         {/* Supported Formats */}

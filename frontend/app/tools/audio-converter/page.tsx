@@ -66,8 +66,30 @@ export default function AudioConverterPage() {
           </p>
         </div>
 
-        {/* Converter Form */}
-        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-8">
+        {/* Coming Soon Notice */}
+        <div className="max-w-2xl mx-auto bg-gradient-to-r from-green-100 to-teal-100 rounded-lg shadow-xl p-12 text-center">
+          <div className="text-6xl mb-6">🎵</div>
+          <h2 className="text-3xl font-bold mb-4 text-green-900">Audio Converter Coming Soon!</h2>
+          <p className="text-lg text-gray-700 mb-6">
+            We're working on bringing you a powerful audio converter. 
+            This feature will be available soon!
+          </p>
+          <div className="bg-white/50 rounded-lg p-6">
+            <h3 className="font-semibold text-gray-800 mb-3">Current Features Available:</h3>
+            <ul className="text-left space-y-2 text-gray-700">
+              <li>✅ YouTube to MP3 Converter (Extract Audio)</li>
+              <li>✅ YouTube Video Downloader</li>
+              <li>✅ Instagram & Facebook Downloaders</li>
+              <li>✅ Image Tools & QR Generator</li>
+            </ul>
+          </div>
+          <a
+            href="/"
+            className="inline-block mt-8 bg-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+          >
+            Go to Home
+          </a>
+        </div>
           <div className="space-y-6">
             {/* File Upload */}
             <div>
