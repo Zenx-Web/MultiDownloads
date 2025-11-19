@@ -6,20 +6,35 @@ import { config } from '../config';
 import { updateJob } from './jobService';
 import { sanitizeFilename } from './urlService';
 
-// Initialize yt-dlp wrapper with auto-download
+// Initialize yt-dlp wrapper
 let ytDlpWrap: YTDlpWrap;
 
-// Detect OS and set appropriate binary name
+// Detect if we're in production (Docker/Fly.io) or development
+const isProduction = process.env.NODE_ENV === 'production';
 const isWindows = process.platform === 'win32';
-const ytDlpBinaryName = isWindows ? 'yt-dlp.exe' : 'yt-dlp';
-const ytDlpPath = path.join(__dirname, '../../', ytDlpBinaryName);
 
-// Download yt-dlp binary if not exists
+// In production (Docker), use system yt-dlp. In development, use local binary
+const ytDlpPath = isProduction 
+  ? '/usr/local/bin/yt-dlp'  // System binary in Docker
+  : path.join(__dirname, '../../', isWindows ? 'yt-dlp.exe' : 'yt-dlp');
+
+// Ensure yt-dlp binary is available
 const ensureYtDlp = async (): Promise<YTDlpWrap> => {
   if (ytDlpWrap) {
     return ytDlpWrap;
   }
 
+  // In production, verify system binary exists
+  if (isProduction) {
+    if (!fs.existsSync(ytDlpPath)) {
+      throw new Error('yt-dlp binary not found in production environment');
+    }
+    console.log('✓ Using system yt-dlp from Docker image');
+    ytDlpWrap = new YTDlpWrap(ytDlpPath);
+    return ytDlpWrap;
+  }
+
+  // In development, download if needed
   if (!fs.existsSync(ytDlpPath)) {
     console.log(`Downloading yt-dlp binary for ${process.platform}...`);
     try {
@@ -30,11 +45,13 @@ const ensureYtDlp = async (): Promise<YTDlpWrap> => {
         fs.chmodSync(ytDlpPath, '755');
       }
       
-      console.log('yt-dlp downloaded successfully');
+      console.log('✓ yt-dlp downloaded successfully');
     } catch (error) {
-      console.error('Failed to download yt-dlp:', error);
+      console.error('✗ Failed to download yt-dlp:', error);
       throw new Error('Failed to initialize yt-dlp downloader');
     }
+  } else {
+    console.log('✓ Using existing yt-dlp binary');
   }
 
   ytDlpWrap = new YTDlpWrap(ytDlpPath);

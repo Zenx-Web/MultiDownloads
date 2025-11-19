@@ -1,13 +1,16 @@
 # Use Node.js LTS with FFmpeg support for Fly.io
 FROM node:20-bullseye-slim
 
-# Install FFmpeg and Python for yt-dlp
+# Install FFmpeg, Python, and yt-dlp
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     python3 \
     python3-pip \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && wget -q https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp \
+    && chmod a+rx /usr/local/bin/yt-dlp
 
 # Set working directory
 WORKDIR /app
