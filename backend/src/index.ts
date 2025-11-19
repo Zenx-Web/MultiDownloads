@@ -73,8 +73,9 @@ app.use(errorHandler);
  * Start server
  */
 const PORT = config.port;
+const HOST = '0.0.0.0'; // Bind to all interfaces for Railway
 
-app.listen(PORT, () => {
+app.listen(PORT, HOST, () => {
   console.log('=================================');
   console.log(`🚀 MultiDownloader API Server`);
   console.log(`📡 Environment: ${config.nodeEnv}`);
