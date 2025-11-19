@@ -104,11 +104,17 @@ export const decrementConcurrentCount = (req: Request) => {
 export const validateQualityLimit = (requestedQuality: string, maxResolution: number): boolean => {
   const qualityMap: { [key: string]: number } = {
     '360': 360,
+    '360p': 360,
     '480': 480,
+    '480p': 480,
     '720': 720,
+    '720p': 720,
     '1080': 1080,
+    '1080p': 1080,
     '1440': 1440,
+    '1440p': 1440,
     '2160': 2160,
+    '2160p': 2160,
   };
 
   const quality = qualityMap[requestedQuality] || 720;
