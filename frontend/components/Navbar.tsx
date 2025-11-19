@@ -23,51 +23,55 @@ export default function Navbar() {
               Home
             </Link>
             <div className="relative group">
-              <button className="text-gray-700 hover:text-blue-600 transition-colors flex items-center font-medium">
+              <button className="text-gray-700 hover:text-blue-600 transition-colors flex items-center font-medium py-2">
                 Downloaders
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-              <div className="absolute hidden group-hover:block bg-white shadow-lg rounded-lg mt-2 py-2 w-48 z-50 border border-gray-100">
-                <Link href="/youtube" className="block px-4 py-2 text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors">
-                  📺 YouTube
-                </Link>
-                <Link href="/instagram" className="block px-4 py-2 text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">
-                  📸 Instagram
-                </Link>
-                <Link href="/facebook" className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-                  👍 Facebook
-                </Link>
-                <Link href="/tiktok" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors">
-                  🎵 TikTok
-                </Link>
+              <div className="absolute left-0 top-full pt-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200">
+                <div className="bg-white shadow-lg rounded-lg py-2 w-48 border border-gray-100">
+                  <Link href="/youtube" className="block px-4 py-2 text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors">
+                    📺 YouTube
+                  </Link>
+                  <Link href="/instagram" className="block px-4 py-2 text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">
+                    📸 Instagram
+                  </Link>
+                  <Link href="/facebook" className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                    👍 Facebook
+                  </Link>
+                  <Link href="/tiktok" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+                    🎵 TikTok
+                  </Link>
+                </div>
               </div>
             </div>
             <div className="relative group">
-              <button className="text-gray-700 hover:text-blue-600 transition-colors flex items-center font-medium">
+              <button className="text-gray-700 hover:text-blue-600 transition-colors flex items-center font-medium py-2">
                 Tools
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-              <div className="absolute hidden group-hover:block bg-white shadow-lg rounded-lg mt-2 py-2 w-56 z-50 border border-gray-100">
-                <Link href="/tools" className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold">
-                  🔧 All Tools
-                </Link>
-                <div className="border-t border-gray-100 my-1"></div>
-                <Link href="/tools/video-converter" className="block px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors text-sm">
-                  🎬 Video Converter
-                </Link>
-                <Link href="/tools/pdf-to-word" className="block px-4 py-2 text-gray-700 hover:bg-green-50 hover:text-green-600 transition-colors text-sm">
-                  📄 PDF to Word
-                </Link>
-                <Link href="/tools/image-resizer" className="block px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors text-sm">
-                  📏 Image Resizer
-                </Link>
-                <Link href="/tools/qr-generator" className="block px-4 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors text-sm">
-                  📱 QR Generator
-                </Link>
+              <div className="absolute left-0 top-full pt-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200">
+                <div className="bg-white shadow-lg rounded-lg py-2 w-56 border border-gray-100">
+                  <Link href="/tools" className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold">
+                    🔧 All Tools
+                  </Link>
+                  <div className="border-t border-gray-100 my-1"></div>
+                  <Link href="/tools/video-converter" className="block px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors text-sm">
+                    🎬 Video Converter
+                  </Link>
+                  <Link href="/tools/pdf-to-word" className="block px-4 py-2 text-gray-700 hover:bg-green-50 hover:text-green-600 transition-colors text-sm">
+                    📄 PDF to Word
+                  </Link>
+                  <Link href="/tools/image-resizer" className="block px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors text-sm">
+                    📏 Image Resizer
+                  </Link>
+                  <Link href="/tools/qr-generator" className="block px-4 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors text-sm">
+                    📱 QR Generator
+                  </Link>
+                </div>
               </div>
             </div>
             <Link href="/about" className="text-gray-700 hover:text-blue-600 transition-colors font-medium">
