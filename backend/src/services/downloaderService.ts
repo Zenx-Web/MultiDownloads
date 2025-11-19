@@ -77,9 +77,19 @@ export const downloadYouTubeVideo = async (
       fs.mkdirSync(config.storage.tempDir, { recursive: true });
     }
 
-    // Check if cookies file exists
+    // Check if cookies file exists or use env variable
     const cookiesPath = path.join(__dirname, '../../cookies.txt');
-    const hasCookies = fs.existsSync(cookiesPath);
+    let hasCookies = fs.existsSync(cookiesPath);
+    
+    // If no file, try to create from environment variable
+    if (!hasCookies && process.env.YOUTUBE_COOKIES) {
+      try {
+        fs.writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES);
+        hasCookies = true;
+      } catch (error) {
+        console.warn('Failed to write cookies from env:', error);
+      }
+    }
 
     // Configure download options with enhanced bot bypass
     const downloadOptions: string[] = [
@@ -409,9 +419,19 @@ export const getMediaInfo = async (
   const ytDlp = await ensureYtDlp();
   
   try {
-    // Check if cookies file exists
+    // Check if cookies file exists or use env variable
     const cookiesPath = path.join(__dirname, '../../cookies.txt');
-    const hasCookies = fs.existsSync(cookiesPath);
+    let hasCookies = fs.existsSync(cookiesPath);
+    
+    // If no file, try to create from environment variable
+    if (!hasCookies && process.env.YOUTUBE_COOKIES) {
+      try {
+        fs.writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES);
+        hasCookies = true;
+      } catch (error) {
+        console.warn('Failed to write cookies from env:', error);
+      }
+    }
 
     // Use the same bot bypass options as downloads with additional proxying
     const infoOptions = [
