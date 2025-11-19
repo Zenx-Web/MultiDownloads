@@ -21,6 +21,11 @@ export const convertVideo = async (
   targetResolution: string | undefined,
   jobId: string
 ): Promise<string> => {
+  // Check if FFmpeg is available
+  if (!config.ffmpeg.path) {
+    throw new Error('FFmpeg is not installed. Video conversion is not available on free hosting tier. Please upgrade to enable converters.');
+  }
+
   const outputPath = path.join(
     config.storage.tempDir,
     `${jobId}_converted.${targetFormat}`
@@ -65,6 +70,11 @@ export const convertVideoToAudio = async (
   bitrate: string | undefined,
   jobId: string
 ): Promise<string> => {
+  // Check if FFmpeg is available
+  if (!config.ffmpeg.path) {
+    throw new Error('FFmpeg is not installed. Audio conversion is not available on free hosting tier. Please upgrade to enable converters.');
+  }
+
   const outputPath = path.join(
     config.storage.tempDir,
     `${jobId}_audio.${targetFormat}`
