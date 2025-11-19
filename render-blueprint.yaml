@@ -1,0 +1,42 @@
+# Render Blueprint for MultiDownloads Backend
+# This separates downloaders (no FFmpeg) and converters (with FFmpeg)
+
+services:
+  # Main Downloader Service (Free tier - No FFmpeg needed)
+  - type: web
+    name: multidownloads-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CORS_ORIGIN
+        value: https://multidownloads.vercel.app
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: YOUTUBE_COOKIES
+        sync: false
+    healthCheckPath: /api/health
+    
+  # Converter Service (Paid plan - Requires FFmpeg)  
+  # Uncomment when you upgrade to paid plan
+  # - type: web
+  #   name: multidownloads-converters
+  #   env: docker
+  #   region: oregon
+  #   plan: starter
+  #   dockerfilePath: ./Dockerfile
+  #   dockerContext: .
+  #   envVars:
+  #     - key: NODE_ENV
+  #       value: production
+  #     - key: PORT
+  #       value: 10000
+  #   healthCheckPath: /api/health
