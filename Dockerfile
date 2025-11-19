@@ -1,7 +1,7 @@
-# Use Node.js LTS with FFmpeg support for Fly.io
-FROM node:20-bullseye-slim
+# Use Node.js LTS with Bookworm (has Python 3.11)
+FROM node:20-bookworm-slim
 
-# Install FFmpeg, Python, and yt-dlp
+# Install FFmpeg, Python 3.11, and yt-dlp
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     python3 \
