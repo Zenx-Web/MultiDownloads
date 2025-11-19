@@ -4,20 +4,23 @@ FROM node:20-alpine
 # Set working directory
 WORKDIR /app
 
-# Copy backend package files
+# Copy backend package files first
 COPY backend/package*.json ./
 
 # Install dependencies
 RUN npm install
 
-# Copy backend source
+# Copy ALL backend source files (including latest changes)
 COPY backend/ ./
 
-# Build TypeScript
+# Build TypeScript from latest source
 RUN npm run build
 
-# Expose the same port the app listens on in production
+# Expose port 8080
 EXPOSE 8080
 
+# Set environment to production
+ENV NODE_ENV=production
+
 # Start the application
-CMD ["npm", "start"]
+CMD ["node", "dist/index.js"]
