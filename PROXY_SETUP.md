@@ -1,5 +1,6 @@
 # Proxy Setup Guide for YouTube Downloads
 
+
 ## Problem
 YouTube blocks requests from datacenter IPs (Fly.io, Railway, AWS, etc.) to prevent bot scraping. This is why it worked on Render initially but then got blocked.
 

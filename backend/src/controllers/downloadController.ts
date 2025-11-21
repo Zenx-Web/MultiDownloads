@@ -37,12 +37,16 @@ export const getVideoInfo = async (
     
     const errorMessage = (error as Error).message;
     
-    // Check for YouTube bot detection
-    if (errorMessage.includes('Sign in to confirm') || errorMessage.includes('not a bot')) {
+    // Check for bot detection or rate limiting
+    if (errorMessage.includes('Sign in to confirm') || 
+        errorMessage.includes('not a bot') ||
+        errorMessage.includes('rate-limit reached') ||
+        errorMessage.includes('login required')) {
       res.status(403).json({
         success: false,
-        error: 'YouTube bot detection triggered',
-        message: 'This video requires fresh authentication cookies. Please try a different video or contact support.',
+        error: 'Authentication required',
+        message: 'This content requires authentication cookies. The platform has rate-limited or blocked access. Try again later or use cookies.',
+        platform: detectPlatform(req.body.url),
       });
       return;
     }
