@@ -15,7 +15,7 @@ import * as path from 'path';
 export const getVideoInfo = async (
   req: Request,
   res: Response
-) => {
+): Promise<void> => {
   try {
     const { url } = req.body;
 
@@ -39,11 +39,12 @@ export const getVideoInfo = async (
     
     // Check for YouTube bot detection
     if (errorMessage.includes('Sign in to confirm') || errorMessage.includes('not a bot')) {
-      return res.status(403).json({
+      res.status(403).json({
         success: false,
         error: 'YouTube bot detection triggered',
         message: 'This video requires fresh authentication cookies. Please try a different video or contact support.',
       });
+      return;
     }
     
     throw new ApiError(500, `Failed to fetch video info: ${errorMessage}`);
