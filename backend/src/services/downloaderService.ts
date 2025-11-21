@@ -5,6 +5,7 @@ import { Platform } from '../types';
 import { config } from '../config';
 import { updateJob } from './jobService';
 import { sanitizeFilename } from './urlService';
+import { proxyRotator } from './proxyService';
 
 // Initialize yt-dlp wrapper
 let ytDlpWrap: YTDlpWrap;
@@ -144,18 +145,46 @@ export const downloadYouTubeVideo = async (
       '--force-ipv4',
     ];
     
-    // Add proxy if configured
-    if (process.env.PROXY_URL) {
-      infoOptions.push('--proxy', process.env.PROXY_URL);
-      console.log('✓ Using proxy for download');
+    // Add proxy with fallback
+    const proxyUrl = process.env.PROXY_URL || proxyRotator.getCurrentProxy();
+    if (proxyUrl) {
+      infoOptions.push('--proxy', proxyUrl);
+      console.log('✓ Using proxy for download:', proxyUrl.split('@').pop() || proxyUrl);
+    } else {
+      console.log('⚠ No proxy available, using direct connection');
     }
     
     if (hasCookies) {
       infoOptions.push('--cookies', cookiesPath);
     }
     
-    const infoJson = await ytDlp.execPromise([url, ...infoOptions]);
-    const info = JSON.parse(infoJson);
+    let infoJson: string;
+    let info: any;
+    let usingProxy = false;
+    
+    try {
+      // Try with proxy first
+      infoJson = await ytDlp.execPromise([url, ...infoOptions]);
+      info = JSON.parse(infoJson);
+      usingProxy = !!proxyUrl;
+    } catch (error) {
+      // If proxy fails, try without proxy
+      if (proxyUrl) {
+        console.warn('⚠ Proxy failed, retrying without proxy...');
+        proxyRotator.markCurrentProxyAsFailed();
+        
+        // Remove proxy from options
+        const noProxyOptions = infoOptions.filter((opt, idx) => {
+          return !(opt === '--proxy' || (infoOptions[idx - 1] === '--proxy'));
+        });
+        
+        infoJson = await ytDlp.execPromise([url, ...noProxyOptions]);
+        info = JSON.parse(infoJson);
+        usingProxy = false;
+      } else {
+        throw error;
+      }
+    }
     
     const title = sanitizeFilename(info.title || 'video');
     const outputFilename = `${jobId}_${title}`;
@@ -184,9 +213,12 @@ export const downloadYouTubeVideo = async (
       downloadOptions.push('--cookies', cookiesPath);
     }
     
-    // Add proxy if configured
-    if (process.env.PROXY_URL) {
-      downloadOptions.push('--proxy', process.env.PROXY_URL);
+    // Add proxy (same as used for info fetch, or fallback)
+    if (usingProxy && proxyUrl) {
+      downloadOptions.push('--proxy', proxyUrl);
+    } else if (!usingProxy && process.env.PROXY_URL) {
+      // If we fell back to no-proxy for info, don't use proxy for download either
+      console.log('⚠ Continuing without proxy for download');
     }
 
     if (format === 'mp3') {
@@ -532,9 +564,11 @@ export const getMediaInfo = async (
         '--force-ipv4'
       );
       
-      // Add proxy if configured
-      if (process.env.PROXY_URL) {
-        infoOptions.push('--proxy', process.env.PROXY_URL);
+      // Add proxy with fallback
+      const proxyUrl = process.env.PROXY_URL || proxyRotator.getCurrentProxy();
+      if (proxyUrl) {
+        infoOptions.push('--proxy', proxyUrl);
+        console.log('✓ Using proxy for info fetch:', proxyUrl.split('@').pop() || proxyUrl);
       }
       
       // Add cookies if available
@@ -548,8 +582,30 @@ export const getMediaInfo = async (
       );
     }
     
-    const info = await ytDlp.execPromise([url, ...infoOptions]);
-    const parsed = JSON.parse(info);
+    let info: string;
+    let parsed: any;
+    
+    try {
+      // Try with proxy first
+      info = await ytDlp.execPromise([url, ...infoOptions]);
+      parsed = JSON.parse(info);
+    } catch (error) {
+      // If proxy fails and we're using YouTube, retry without proxy
+      if (isYouTube && (process.env.PROXY_URL || proxyRotator.getCurrentProxy())) {
+        console.warn('⚠ Proxy failed for info fetch, retrying without proxy...');
+        proxyRotator.markCurrentProxyAsFailed();
+        
+        // Remove proxy from options
+        const noProxyOptions = infoOptions.filter((opt, idx) => {
+          return !(opt === '--proxy' || (infoOptions[idx - 1] === '--proxy'));
+        });
+        
+        info = await ytDlp.execPromise([url, ...noProxyOptions]);
+        parsed = JSON.parse(info);
+      } else {
+        throw error;
+      }
+    }
     
     // Extract relevant information
     return {
