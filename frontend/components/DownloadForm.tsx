@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import CookieConsent from './CookieConsent';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -31,7 +32,6 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
   const [format, setFormat] = useState('mp4');
   const [action, setAction] = useState('download');
   const [cookies, setCookies] = useState('');
-  const [showCookies, setShowCookies] = useState(false);
   const [downloadState, setDownloadState] = useState<DownloadState>({
     videoInfo: null,
     jobId: null,
@@ -40,6 +40,18 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
     error: null,
     downloadUrl: null,
   });
+
+  // Load cookies from localStorage on mount
+  useEffect(() => {
+    const savedCookies = localStorage.getItem('youtubeCookies');
+    if (savedCookies) {
+      setCookies(savedCookies);
+    }
+  }, []);
+
+  const handleCookieAccept = (extractedCookies: string) => {
+    setCookies(extractedCookies);
+  };
 
   // Poll job status when processing
   useEffect(() => {
@@ -188,6 +200,8 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
 
   return (
     <div className="bg-white rounded-lg shadow-xl p-8">
+      <CookieConsent onAccept={handleCookieAccept} />
+      
       <div className="space-y-6">
         {/* URL Input */}
         <div>
@@ -204,51 +218,6 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             required
           />
-        </div>
-
-        {/* YouTube Cookies Input (Optional) */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700">
-              YouTube Cookies (Optional)
-            </label>
-            <button
-              type="button"
-              onClick={() => setShowCookies(!showCookies)}
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-            >
-              {showCookies ? '▼ Hide' : '▶ Show'} Advanced Options
-            </button>
-          </div>
-          
-          {showCookies && (
-            <div className="space-y-2">
-              <textarea
-                value={cookies}
-                onChange={(e) => setCookies(e.target.value)}
-                disabled={downloadState.status !== 'idle'}
-                placeholder="Paste YouTube cookies here (Netscape format)&#10;&#10;Example:&#10;.youtube.com	TRUE	/	TRUE	1234567890	VISITOR_INFO1_LIVE	abcd1234..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 font-mono text-xs h-32 resize-vertical"
-              />
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-xs text-gray-700 mb-2">
-                  <strong>Why provide cookies?</strong> YouTube may block downloads from server IPs. Your browser cookies help bypass this.
-                </p>
-                <details className="text-xs text-gray-600">
-                  <summary className="cursor-pointer font-medium mb-1">📖 How to get your cookies</summary>
-                  <ol className="list-decimal ml-4 mt-2 space-y-1">
-                    <li>Install a cookie exporter extension (e.g., "Get cookies.txt LOCALLY" for Chrome/Firefox)</li>
-                    <li>Go to YouTube.com and make sure you're logged in</li>
-                    <li>Click the extension icon and export cookies in Netscape format</li>
-                    <li>Copy the contents and paste them above</li>
-                  </ol>
-                  <p className="mt-2 text-amber-700">
-                    ⚠️ Note: Your cookies are only used for this download and are not stored on our servers.
-                  </p>
-                </details>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Video Info Display */}

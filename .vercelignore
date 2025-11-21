@@ -1,0 +1,9 @@
+backend 
+node_modules/
+.git/
+*.txt
+.fly/
+Dockerfile
+fly.toml
+*.md
+.dockerignore
