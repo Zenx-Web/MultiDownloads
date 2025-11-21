@@ -160,29 +160,43 @@ export const downloadYouTubeVideo = async (
     
     let infoJson: string;
     let info: any;
-    let usingProxy = false;
+    let workingProxyUrl: string | null = null;
+    let maxProxyRetries = 5;
     
-    try {
-      // Try with proxy first
-      infoJson = await ytDlp.execPromise([url, ...infoOptions]);
-      info = JSON.parse(infoJson);
-      usingProxy = !!proxyUrl;
-    } catch (error) {
-      // If proxy fails, try without proxy
-      if (proxyUrl) {
-        console.warn('⚠ Proxy failed, retrying without proxy...');
-        proxyRotator.markCurrentProxyAsFailed();
+    // Try with proxies, cycling through them on failure
+    for (let attempt = 0; attempt < maxProxyRetries; attempt++) {
+      const currentProxy = process.env.PROXY_URL || proxyRotator.getCurrentProxy();
+      
+      if (currentProxy && attempt < maxProxyRetries - 1) {
+        // Try with proxy
+        const proxyOptions = [...infoOptions, '--proxy', currentProxy];
+        console.log(`✓ Attempt ${attempt + 1}: Using proxy ${currentProxy.split('@').pop() || currentProxy}`);
         
-        // Remove proxy from options
-        const noProxyOptions = infoOptions.filter((opt, idx) => {
-          return !(opt === '--proxy' || (infoOptions[idx - 1] === '--proxy'));
-        });
-        
-        infoJson = await ytDlp.execPromise([url, ...noProxyOptions]);
-        info = JSON.parse(infoJson);
-        usingProxy = false;
+        try {
+          infoJson = await ytDlp.execPromise([url, ...proxyOptions]);
+          info = JSON.parse(infoJson);
+          workingProxyUrl = currentProxy;
+          console.log('✅ Proxy succeeded!');
+          break;
+        } catch (error) {
+          console.warn(`❌ Proxy ${attempt + 1} failed, trying next...`);
+          proxyRotator.markCurrentProxyAsFailed();
+          continue;
+        }
       } else {
-        throw error;
+        // Last attempt or no proxies - try without proxy
+        console.log('⚠ Trying without proxy as final attempt...');
+        try {
+          infoJson = await ytDlp.execPromise([url, ...infoOptions]);
+          info = JSON.parse(infoJson);
+          workingProxyUrl = null;
+          console.log('✅ Direct connection succeeded!');
+          break;
+        } catch (error) {
+          if (attempt === maxProxyRetries - 1) {
+            throw error;
+          }
+        }
       }
     }
     
@@ -213,12 +227,12 @@ export const downloadYouTubeVideo = async (
       downloadOptions.push('--cookies', cookiesPath);
     }
     
-    // Add proxy (same as used for info fetch, or fallback)
-    if (usingProxy && proxyUrl) {
-      downloadOptions.push('--proxy', proxyUrl);
-    } else if (!usingProxy && process.env.PROXY_URL) {
-      // If we fell back to no-proxy for info, don't use proxy for download either
-      console.log('⚠ Continuing without proxy for download');
+    // Use the same proxy that worked for info fetch
+    if (workingProxyUrl) {
+      downloadOptions.push('--proxy', workingProxyUrl);
+      console.log(`✓ Using working proxy for download: ${workingProxyUrl.split('@').pop() || workingProxyUrl}`);
+    } else {
+      console.log('⚠ Downloading without proxy');
     }
 
     if (format === 'mp3') {
@@ -564,13 +578,6 @@ export const getMediaInfo = async (
         '--force-ipv4'
       );
       
-      // Add proxy with fallback
-      const proxyUrl = process.env.PROXY_URL || proxyRotator.getCurrentProxy();
-      if (proxyUrl) {
-        infoOptions.push('--proxy', proxyUrl);
-        console.log('✓ Using proxy for info fetch:', proxyUrl.split('@').pop() || proxyUrl);
-      }
-      
       // Add cookies if available
       if (cookiesPath) {
         infoOptions.push('--cookies', cookiesPath);
@@ -584,26 +591,42 @@ export const getMediaInfo = async (
     
     let info: string;
     let parsed: any;
+    let maxProxyRetries = 5;
     
-    try {
-      // Try with proxy first
-      info = await ytDlp.execPromise([url, ...infoOptions]);
-      parsed = JSON.parse(info);
-    } catch (error) {
-      // If proxy fails and we're using YouTube, retry without proxy
-      if (isYouTube && (process.env.PROXY_URL || proxyRotator.getCurrentProxy())) {
-        console.warn('⚠ Proxy failed for info fetch, retrying without proxy...');
-        proxyRotator.markCurrentProxyAsFailed();
+    // Try with multiple proxies, cycling through them on failure
+    for (let attempt = 0; attempt < maxProxyRetries; attempt++) {
+      const currentProxy = isYouTube ? (process.env.PROXY_URL || proxyRotator.getCurrentProxy()) : null;
+      
+      if (currentProxy && attempt < maxProxyRetries - 1) {
+        // Try with proxy
+        const proxyOptions = [...infoOptions, '--proxy', currentProxy];
+        console.log(`✓ Attempt ${attempt + 1}: Using proxy ${currentProxy.split('@').pop() || currentProxy}`);
         
-        // Remove proxy from options
-        const noProxyOptions = infoOptions.filter((opt, idx) => {
-          return !(opt === '--proxy' || (infoOptions[idx - 1] === '--proxy'));
-        });
-        
-        info = await ytDlp.execPromise([url, ...noProxyOptions]);
-        parsed = JSON.parse(info);
+        try {
+          info = await ytDlp.execPromise([url, ...proxyOptions]);
+          parsed = JSON.parse(info);
+          console.log('✅ Proxy succeeded for info fetch!');
+          break;
+        } catch (error) {
+          console.warn(`❌ Proxy ${attempt + 1} failed, trying next...`);
+          if (isYouTube) {
+            proxyRotator.markCurrentProxyAsFailed();
+          }
+          continue;
+        }
       } else {
-        throw error;
+        // Last attempt or no proxies - try without proxy
+        console.log('⚠ Trying info fetch without proxy as final attempt...');
+        try {
+          info = await ytDlp.execPromise([url, ...infoOptions]);
+          parsed = JSON.parse(info);
+          console.log('✅ Direct connection succeeded for info!');
+          break;
+        } catch (error) {
+          if (attempt === maxProxyRetries - 1) {
+            throw error;
+          }
+        }
       }
     }
     
