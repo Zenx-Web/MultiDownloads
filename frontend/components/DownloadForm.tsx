@@ -32,6 +32,7 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
   const [format, setFormat] = useState('mp4');
   const [action, setAction] = useState('download');
   const [cookies, setCookies] = useState('');
+  const [showCookiesInput, setShowCookiesInput] = useState(false);
   const [downloadState, setDownloadState] = useState<DownloadState>({
     videoInfo: null,
     jobId: null,
@@ -143,14 +144,29 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
 
       } catch (err: any) {
         const errorMsg = err.response?.data?.error || err.message || 'Failed to process request';
-        setDownloadState({
-          videoInfo: null,
-          jobId: null,
-          status: 'idle',
-          progress: 0,
-          error: errorMsg,
-          downloadUrl: null,
-        });
+        const errorMessage = err.response?.data?.message || errorMsg;
+        
+        // Check if authentication is required
+        if (errorMsg.includes('Authentication required') || errorMsg.includes('rate-limit') || errorMsg.includes('login required')) {
+          setDownloadState({
+            videoInfo: null,
+            jobId: null,
+            status: 'idle',
+            progress: 0,
+            error: errorMessage,
+            downloadUrl: null,
+          });
+          setShowCookiesInput(true); // Show cookies input when auth is needed
+        } else {
+          setDownloadState({
+            videoInfo: null,
+            jobId: null,
+            status: 'idle',
+            progress: 0,
+            error: errorMessage,
+            downloadUrl: null,
+          });
+        }
         console.error('Download error:', err);
       }
     }
@@ -211,6 +227,38 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
             required
           />
         </div>
+
+        {/* Cookies Input (shows when needed) */}
+        {showCookiesInput && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <div className="flex items-start gap-2 mb-3">
+              <span className="text-2xl">🍪</span>
+              <div>
+                <h4 className="font-semibold text-amber-900 mb-1">Authentication Required</h4>
+                <p className="text-sm text-amber-700 mb-2">
+                  This content requires authentication cookies. Paste your cookies below to continue.
+                </p>
+              </div>
+            </div>
+            <textarea
+              value={cookies}
+              onChange={(e) => setCookies(e.target.value)}
+              placeholder="Paste your cookies here (Netscape format)&#10;&#10;Example:&#10;.youtube.com	TRUE	/	TRUE	1234567890	VISITOR_INFO1_LIVE	abcd1234..."
+              className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent font-mono text-xs h-24 resize-vertical"
+            />
+            <details className="mt-2">
+              <summary className="text-xs text-amber-700 cursor-pointer hover:text-amber-900">
+                📖 How to get cookies?
+              </summary>
+              <ol className="text-xs text-amber-600 mt-2 ml-4 list-decimal space-y-1">
+                <li>Install a cookie exporter extension (e.g., "Get cookies.txt LOCALLY")</li>
+                <li>Go to YouTube.com or Instagram.com and log in</li>
+                <li>Click the extension and export cookies in Netscape format</li>
+                <li>Copy and paste the cookies above</li>
+              </ol>
+            </details>
+          </div>
+        )}
 
         {/* Video Info Display */}
         {downloadState.videoInfo && (
