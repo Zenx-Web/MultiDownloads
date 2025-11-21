@@ -80,7 +80,14 @@ type CookieCandidate = {
 };
 
 const backendRoot = path.resolve(__dirname, '../../');
-const repoRoot = path.resolve(__dirname, '../../../');
+const candidateSearchRoots = Array.from(
+  new Set([
+    backendRoot,
+    path.resolve(process.cwd()),
+    path.resolve(process.cwd(), '..'),
+    path.resolve(__dirname, '../../../'),
+  ])
+);
 
 const COOKIE_RETRY_PATTERNS = [
   'sign in to confirm',
@@ -159,15 +166,53 @@ const buildCookieCandidates = (jobId?: string, userCookies?: string): CookieCand
     }
   };
 
-  if (userCookies && userCookies.trim().length > 0) {
+  const ensureTempDir = () => {
     if (!fs.existsSync(config.storage.tempDir)) {
       fs.mkdirSync(config.storage.tempDir, { recursive: true });
     }
+  };
+
+  const addInlineCookieCandidate = (label: string, content: string) => {
+    if (!content || content.trim().length === 0) {
+      return;
+    }
+
+    try {
+      ensureTempDir();
+      const safeLabel = label.replace(/[^a-z0-9_-]+/gi, '_');
+      const tempCookiePath = path.join(
+        config.storage.tempDir,
+        `${safeLabel}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`
+      );
+      fs.writeFileSync(tempCookiePath, content);
+      addCandidate(label, tempCookiePath, true);
+    } catch (error) {
+      console.warn(`⚠ Failed to materialize ${label}:`, error);
+    }
+  };
+
+  if (userCookies && userCookies.trim().length > 0) {
+    ensureTempDir();
 
     const safeJobId = jobId || `manual_${Date.now()}`;
     const tempCookiePath = path.join(config.storage.tempDir, `user_cookies_${safeJobId}.txt`);
     fs.writeFileSync(tempCookiePath, userCookies);
     addCandidate('user-supplied cookies', tempCookiePath, true);
+  }
+
+  const inlineEnvCookies = process.env.YOUTUBE_COOKIES_TEXT;
+  if (inlineEnvCookies) {
+    addInlineCookieCandidate('env:inline-text', inlineEnvCookies);
+  }
+
+  const inlineEnvCookiesBase64 = process.env.YOUTUBE_COOKIES_BASE64;
+  if (inlineEnvCookiesBase64) {
+    try {
+      const decoded = Buffer.from(inlineEnvCookiesBase64, 'base64').toString('utf-8');
+      addInlineCookieCandidate('env:inline-base64', decoded);
+    } catch (error) {
+      console.warn('⚠ Failed to decode YOUTUBE_COOKIES_BASE64:', error);
+    }
   }
 
   for (const envPath of parseEnvCookieFiles()) {
@@ -177,9 +222,11 @@ const buildCookieCandidates = (jobId?: string, userCookies?: string): CookieCand
 
   addCandidate('backend cookies.txt', path.join(backendRoot, 'cookies.txt'));
   addCandidate('stored user cookies', path.join(backendRoot, 'user_cookies.txt'));
-  addCandidate('repo cookies_update.txt', path.join(repoRoot, 'cookies_update.txt'));
-  addCandidate('repo cookies_music.txt', path.join(repoRoot, 'cookies_music.txt'));
-  addCandidate('repo youtube_cookies_fresh.txt', path.join(repoRoot, 'youtube_cookies_fresh.txt'));
+  for (const root of candidateSearchRoots) {
+    addCandidate('repo cookies_update.txt', path.join(root, 'cookies_update.txt'));
+    addCandidate('repo cookies_music.txt', path.join(root, 'cookies_music.txt'));
+    addCandidate('repo youtube_cookies_fresh.txt', path.join(root, 'youtube_cookies_fresh.txt'));
+  }
 
   addCandidate('no cookies');
 

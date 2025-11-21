@@ -24,6 +24,11 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy ALL backend source files
 COPY backend/ ./
 
+# Include bundled cookie files for yt-dlp fallbacks
+COPY cookies_update.txt ./
+COPY cookies_music.txt ./
+COPY youtube_cookies_fresh.txt ./
+
 # Build TypeScript
 RUN npm install typescript @types/node --save-dev && npm run build
 
