@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { downloadFileFromApi } from '@/lib/fileDownload';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -22,6 +23,7 @@ interface JobStatus {
 export default function ProgressTracker({ jobId, onReset }: ProgressTrackerProps) {
   const [job, setJob] = useState<JobStatus | null>(null);
   const [error, setError] = useState('');
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     const pollStatus = async () => {
@@ -115,19 +117,31 @@ export default function ProgressTracker({ jobId, onReset }: ProgressTrackerProps
         {/* Action Buttons */}
         <div className="flex gap-4 justify-center">
           {job?.status === 'completed' && (
-            <a
-              href={`http://localhost:5000${job.downloadUrl}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+            <button
+              onClick={async () => {
+                if (!job?.downloadUrl) return;
+                setDownloading(true);
+                setError('');
+                try {
+                  await downloadFileFromApi(job.downloadUrl, API_URL);
+                } catch (err) {
+                  console.error('Download failed:', err);
+                  setError(err instanceof Error ? err.message : 'Failed to download file');
+                } finally {
+                  setDownloading(false);
+                }
+              }}
+              disabled={downloading}
+              className="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              Download File
-            </a>
+              {downloading ? 'Downloading...' : 'Download File'}
+            </button>
           )}
 
           <button
             onClick={onReset}
-            className="bg-gray-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-colors"
+            disabled={downloading}
+            className="bg-gray-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {job?.status === 'completed' || job?.status === 'failed'
               ? 'Start New Download'

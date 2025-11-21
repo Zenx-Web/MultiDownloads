@@ -1,6 +1,7 @@
 import express, { Application } from 'express';
 import cors from 'cors';
 import * as fs from 'fs';
+import * as path from 'path';
 import { config } from './config';
 import routes from './routes';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
@@ -27,6 +28,12 @@ app.use(
   })
 );
 
+// Expose download-related headers to the browser
+app.use((_req, res, next) => {
+  res.header('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length');
+  next();
+});
+
 // Rate limiting
 app.use('/api', apiLimiter);
 
@@ -40,6 +47,14 @@ if (!fs.existsSync(config.storage.tempDir)) {
   fs.mkdirSync(config.storage.tempDir, { recursive: true });
   console.log(`Created temp directory: ${config.storage.tempDir}`);
 }
+
+const uploadsDir = path.resolve(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log(`Created uploads directory: ${uploadsDir}`);
+}
+
+app.use('/uploads', express.static(uploadsDir));
 
 /**
  * Routes

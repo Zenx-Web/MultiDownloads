@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import CookieConsent from './CookieConsent';
+import { downloadFileFromApi } from '@/lib/fileDownload';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -26,6 +27,15 @@ interface DownloadState {
   downloadUrl: string | null;
 }
 
+const createInitialDownloadState = (): DownloadState => ({
+  videoInfo: null,
+  jobId: null,
+  status: 'idle',
+  progress: 0,
+  error: null,
+  downloadUrl: null,
+});
+
 export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
   const [url, setUrl] = useState('');
   const [quality, setQuality] = useState('720p');
@@ -33,14 +43,12 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
   const [action, setAction] = useState('download');
   const [cookies, setCookies] = useState('');
   const [showCookiesInput, setShowCookiesInput] = useState(false);
-  const [downloadState, setDownloadState] = useState<DownloadState>({
-    videoInfo: null,
-    jobId: null,
-    status: 'idle',
-    progress: 0,
-    error: null,
-    downloadUrl: null,
-  });
+  const [downloadState, setDownloadState] = useState<DownloadState>(() => createInitialDownloadState());
+
+  const resetDownloadState = () => {
+    setDownloadState(createInitialDownloadState());
+    setUrl('');
+  };
 
   // Load saved cookies on mount
   useEffect(() => {
@@ -193,22 +201,31 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
     }
     // Second click: Download the file
     else if (downloadState.status === 'ready' && downloadState.downloadUrl) {
-      // Remove /api prefix from downloadUrl since API_URL already includes it
-      const cleanUrl = downloadState.downloadUrl.replace(/^\/api/, '');
-      window.location.href = `${API_URL}${cleanUrl}`;
-      
-      // Reset after a delay
-      setTimeout(() => {
-        setDownloadState({
-          videoInfo: null,
-          jobId: null,
-          status: 'idle',
-          progress: 0,
-          error: null,
-          downloadUrl: null,
-        });
-        setUrl('');
-      }, 2000);
+      if (!downloadState.downloadUrl) {
+        setDownloadState((prev) => ({
+          ...prev,
+          error: 'Download link is unavailable. Please try again.',
+        }));
+        return;
+      }
+
+      setDownloadState((prev) => ({
+        ...prev,
+        status: 'downloading',
+        error: null,
+      }));
+
+      try {
+        await downloadFileFromApi(downloadState.downloadUrl, API_URL);
+        resetDownloadState();
+      } catch (err) {
+        console.error('Download trigger failed:', err);
+        setDownloadState((prev) => ({
+          ...prev,
+          status: 'ready',
+          error: err instanceof Error ? err.message : 'Failed to start download',
+        }));
+      }
     }
   };
 
@@ -218,6 +235,8 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
         return 'Fetching video info...';
       case 'processing':
         return `Processing... ${downloadState.progress}%`;
+      case 'downloading':
+        return 'Starting download...';
       case 'ready':
         return '⬇️ Download Ready - Click to Save';
       default:
@@ -225,7 +244,10 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
     }
   };
 
-  const isButtonDisabled = downloadState.status === 'fetching' || downloadState.status === 'processing';
+  const isButtonDisabled =
+    downloadState.status === 'fetching' ||
+    downloadState.status === 'processing' ||
+    downloadState.status === 'downloading';
 
   return (
     <div className="bg-white rounded-lg shadow-xl p-8">
@@ -349,15 +371,23 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
             </div>
             
             {/* Progress Bar */}
-            {downloadState.status === 'processing' && (
+            {(downloadState.status === 'processing' || downloadState.status === 'downloading') && (
               <div className="mt-4">
                 <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div 
+                  <div
                     className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                    style={{ width: `${downloadState.progress}%` }}
+                    style={{
+                      width: `${
+                        downloadState.status === 'downloading' ? 100 : downloadState.progress
+                      }%`,
+                    }}
                   ></div>
                 </div>
-                <p className="text-xs text-gray-600 mt-1 text-center">Processing your download...</p>
+                <p className="text-xs text-gray-600 mt-1 text-center">
+                  {downloadState.status === 'downloading'
+                    ? 'Preparing your download...'
+                    : 'Processing your download...'}
+                </p>
               </div>
             )}
           </div>

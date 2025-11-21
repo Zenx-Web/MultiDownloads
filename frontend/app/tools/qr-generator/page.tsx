@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { fetchJobStatus, resolveDownloadUrl } from '@/lib/jobStatus';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -38,20 +39,20 @@ export default function QRCodeGeneratorPage() {
       // Poll for job status
       const jobId = data.jobId;
       const pollInterval = setInterval(async () => {
-        const statusResponse = await fetch(`${API_URL}/job/${jobId}`);
-        const statusData = await statusResponse.json();
+        try {
+          const jobData = await fetchJobStatus(jobId, API_URL);
 
-        if (statusData.status === 'completed') {
-          clearInterval(pollInterval);
-          const fullUrl = statusData.downloadUrl.startsWith('http') 
-            ? statusData.downloadUrl 
-            : `${API_URL}${statusData.downloadUrl}`;
-          setQrCodeUrl(fullUrl);
-          setLoading(false);
-        } else if (statusData.status === 'failed') {
-          clearInterval(pollInterval);
-          setError(statusData.error || 'Generation failed');
-          setLoading(false);
+          if (jobData.status === 'completed') {
+            clearInterval(pollInterval);
+            setQrCodeUrl(resolveDownloadUrl(jobData.downloadUrl, API_URL));
+            setLoading(false);
+          } else if (jobData.status === 'failed') {
+            clearInterval(pollInterval);
+            setError(jobData.error || 'Generation failed');
+            setLoading(false);
+          }
+        } catch (pollError) {
+          console.error('QR status check failed:', pollError);
         }
       }, 500);
 

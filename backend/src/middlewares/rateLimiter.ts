@@ -1,5 +1,12 @@
 import rateLimit from 'express-rate-limit';
+import { Request } from 'express';
 import { config } from '../config';
+
+const shouldSkipGeneralLimiter = (req: Request) => {
+  const path = req.path || '';
+  // Allow frequent polling of job status without tripping the limiter
+  return path.startsWith('/status/');
+};
 
 /**
  * General API rate limiter
@@ -13,6 +20,7 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: shouldSkipGeneralLimiter,
 });
 
 /**

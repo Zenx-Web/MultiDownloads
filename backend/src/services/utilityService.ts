@@ -5,6 +5,14 @@ import QRCode from 'qrcode';
 import sharp from 'sharp';
 import { updateJob } from './jobService';
 
+const uploadsDir = path.resolve(process.cwd(), 'uploads');
+
+const ensureUploadsDir = () => {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+};
+
 /**
  * Generate QR Code from text/URL
  */
@@ -13,7 +21,9 @@ export const generateQRCode = async (
   size: number,
   jobId: string
 ): Promise<string> => {
-  const outputPath = path.join('uploads', `qr-${jobId}.png`);
+  ensureUploadsDir();
+  const fileName = `qr-${jobId}.png`;
+  const outputPath = path.join(uploadsDir, fileName);
 
   await QRCode.toFile(outputPath, text, {
     width: size,
@@ -24,7 +34,7 @@ export const generateQRCode = async (
     },
   });
 
-  const downloadUrl = `http://localhost:5000/uploads/${path.basename(outputPath)}`;
+  const downloadUrl = `/uploads/${fileName}`;
   updateJob(jobId, {
     status: 'completed',
     filePath: outputPath,
@@ -43,6 +53,7 @@ export const generateHash = async (
   algorithm: 'md5' | 'sha1' | 'sha256' | 'sha512',
   jobId: string
 ): Promise<string> => {
+  ensureUploadsDir();
   const hash = crypto.createHash(algorithm);
 
   if (inputPath && fs.existsSync(inputPath)) {
@@ -59,16 +70,25 @@ export const generateHash = async (
   const hashResult = hash.digest('hex');
   
   // Save hash to a text file
-  const outputPath = path.join('uploads', `hash-${jobId}.txt`);
+  const fileName = `hash-${jobId}.txt`;
+  const outputPath = path.join(uploadsDir, fileName);
   fs.writeFileSync(outputPath, `${algorithm.toUpperCase()}: ${hashResult}`);
 
-  const downloadUrl = `http://localhost:5000/uploads/${path.basename(outputPath)}`;
+  const downloadUrl = `/uploads/${fileName}`;
   updateJob(jobId, {
     status: 'completed',
     filePath: outputPath,
     downloadUrl,
     metadata: { hash: hashResult },
   });
+
+  if (inputPath && fs.existsSync(inputPath)) {
+    fs.unlink(inputPath, (error) => {
+      if (error) {
+        console.warn(`⚠ Failed to delete temporary input for hash job ${jobId}:`, error.message);
+      }
+    });
+  }
 
   return hashResult;
 };
@@ -81,6 +101,7 @@ export const formatText = async (
   operation: 'uppercase' | 'lowercase' | 'titlecase' | 'capitalize' | 'trim' | 'removeSpaces',
   jobId: string
 ): Promise<string> => {
+  ensureUploadsDir();
   let result: string;
 
   switch (operation) {
@@ -113,10 +134,11 @@ export const formatText = async (
   };
 
   // Save to file
-  const outputPath = path.join('uploads', `text-${jobId}.txt`);
+  const fileName = `text-${jobId}.txt`;
+  const outputPath = path.join(uploadsDir, fileName);
   fs.writeFileSync(outputPath, result);
 
-  const downloadUrl = `http://localhost:5000/uploads/${path.basename(outputPath)}`;
+  const downloadUrl = `/uploads/${fileName}`;
   updateJob(jobId, {
     status: 'completed',
     filePath: outputPath,
@@ -135,10 +157,35 @@ export const extractColorPalette = async (
   colorCount: number,
   jobId: string
 ): Promise<string[]> => {
+  ensureUploadsDir();
   const ColorThief = require('colorthief');
 
-  // Get dominant colors
-  const palette = await ColorThief.getPalette(inputPath, colorCount);
+  let palette: number[][] | null = null;
+  let usedFallback = false;
+  try {
+    palette = await ColorThief.getPalette(inputPath, colorCount);
+  } catch (error) {
+    console.warn(`⚠ ColorThief failed for palette job ${jobId}:`, (error as Error).message);
+  }
+
+  // Fallback to dominant color if palette detection fails
+  if (!Array.isArray(palette) || palette.length === 0) {
+    const stats = await sharp(inputPath).stats();
+    const dominant = stats?.dominant;
+
+    if (!dominant) {
+      throw new Error('Unable to detect colors from the provided image');
+    }
+
+    const fallbackColor: number[] = [
+      Math.round(dominant.r),
+      Math.round(dominant.g),
+      Math.round(dominant.b),
+    ];
+
+    usedFallback = true;
+    palette = Array.from({ length: Math.max(1, colorCount) }, () => fallbackColor);
+  }
 
   // Convert RGB arrays to hex
   const hexColors = palette.map((rgb: number[]) => {
@@ -203,7 +250,8 @@ export const extractColorPalette = async (
     top: index * colorBlockHeight,
   }));
 
-  const outputPath = path.join('uploads', `palette-${jobId}.png`);
+  const fileName = `palette-${jobId}.png`;
+  const outputPath = path.join(uploadsDir, fileName);
   await sharp({
     create: {
       width: paletteWidth,
@@ -216,13 +264,24 @@ export const extractColorPalette = async (
     .png()
     .toFile(outputPath);
 
-  const downloadUrl = `http://localhost:5000/uploads/${path.basename(outputPath)}`;
+  const downloadUrl = `/uploads/${fileName}`;
   updateJob(jobId, {
     status: 'completed',
     filePath: outputPath,
     downloadUrl,
-    metadata: { colors: hexColors },
+    metadata: {
+      colors: hexColors,
+      detectionMethod: usedFallback ? 'fallback' : 'palette',
+    },
   });
+
+  if (fs.existsSync(inputPath)) {
+    fs.unlink(inputPath, (error) => {
+      if (error) {
+        console.warn(`⚠ Failed to delete temporary input for palette job ${jobId}:`, error.message);
+      }
+    });
+  }
 
   return hexColors;
 };
@@ -234,6 +293,7 @@ export const generateFavicon = async (
   inputPath: string,
   jobId: string
 ): Promise<string> => {
+  ensureUploadsDir();
   const toIco = require('to-ico');
   
   // Generate multiple sizes
@@ -250,15 +310,24 @@ export const generateFavicon = async (
   // Create ICO file
   const icoBuffer = await toIco(pngBuffers);
 
-  const outputPath = path.join('uploads', `favicon-${jobId}.ico`);
+  const fileName = `favicon-${jobId}.ico`;
+  const outputPath = path.join(uploadsDir, fileName);
   fs.writeFileSync(outputPath, icoBuffer);
 
-  const downloadUrl = `http://localhost:5000/uploads/${path.basename(outputPath)}`;
+  const downloadUrl = `/uploads/${fileName}`;
   updateJob(jobId, {
     status: 'completed',
     filePath: outputPath,
     downloadUrl,
   });
+
+  if (fs.existsSync(inputPath)) {
+    fs.unlink(inputPath, (error) => {
+      if (error) {
+        console.warn(`⚠ Failed to delete temporary input for favicon job ${jobId}:`, error.message);
+      }
+    });
+  }
 
   return outputPath;
 };

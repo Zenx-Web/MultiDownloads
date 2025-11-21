@@ -362,6 +362,7 @@ export const downloadYouTubeVideo = async (
     let lastErrorMessage = '';
 
     for (let index = 0; index < cookieCandidates.length; index += 1) {
+      let lastProgress = 20;
       const candidate = cookieCandidates[index];
       const isLastAttempt = index === cookieCandidates.length - 1;
 
@@ -461,8 +462,6 @@ export const downloadYouTubeVideo = async (
 
         const ytDlpProcess = ytDlp.exec([sanitizedUrl, ...downloadOptions]);
 
-        let lastProgress = 20;
-
         const downloadedPath = await new Promise<string>((resolve, reject) => {
           ytDlpProcess.on('progress', (progress) => {
             if (progress.percent) {
@@ -534,20 +533,19 @@ export const downloadYouTubeVideo = async (
         lastErrorMessage = message;
         attemptErrors.push(`[${candidate.label}] ${message}`);
 
-        if (!isLastAttempt && shouldRetryWithNextCookies(message)) {
+        if (!isLastAttempt) {
+          const nextLabel = cookieCandidates[index + 1]?.label || 'next cookie option';
+          const fallbackMessage = shouldRetryWithNextCookies(message)
+            ? 'Encountered platform protection. Retrying with alternate cookies...'
+            : `Attempt with ${candidate.label} failed. Trying ${nextLabel}...`;
+
           console.warn(`✗ Attempt with ${candidate.label} failed: ${message}`);
           updateJob(jobId, {
-            progress: 15,
-            message: 'Encountered bot detection. Retrying with alternate cookies...',
+            progress: Math.max(lastProgress - 10, 10),
+            message: fallbackMessage,
           });
           continue;
         }
-
-        if (isLastAttempt) {
-          continue;
-        }
-
-        throw new Error(message);
       }
     }
 

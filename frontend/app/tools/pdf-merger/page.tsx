@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { fetchJobStatus, resolveDownloadUrl, type JobStatusPayload } from '@/lib/jobStatus';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -10,6 +11,9 @@ export default function PdfMergerPage() {
   const [loading, setLoading] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState('');
   const [error, setError] = useState('');
+  const [jobProgress, setJobProgress] = useState<number | null>(null);
+  const [jobMessage, setJobMessage] = useState('');
+  const [jobState, setJobState] = useState<JobStatusPayload['status'] | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -17,6 +21,9 @@ export default function PdfMergerPage() {
       setFiles(selectedFiles);
       setError('');
       setDownloadUrl('');
+      setJobProgress(null);
+      setJobMessage('');
+      setJobState(null);
     }
   };
 
@@ -47,6 +54,9 @@ export default function PdfMergerPage() {
     setLoading(true);
     setError('');
     setDownloadUrl('');
+    setJobProgress(5);
+    setJobMessage('Uploading files...');
+    setJobState('pending');
 
     const formData = new FormData();
     files.forEach((file) => {
@@ -65,36 +75,61 @@ export default function PdfMergerPage() {
         throw new Error(data.error || 'Merge failed');
       }
 
-      // Poll for job status
       const jobId = data.jobId;
-      const pollInterval = setInterval(async () => {
-        const statusResponse = await fetch(`${API_URL}/job/${jobId}`);
-        const statusData = await statusResponse.json();
+      let isActive = true;
+      let timeoutId: ReturnType<typeof setTimeout>;
 
-        if (statusData.status === 'completed') {
+      const pollInterval = setInterval(async () => {
+        try {
+          const job = await fetchJobStatus(jobId, API_URL);
+          setJobProgress((prev) => (typeof job.progress === 'number' ? job.progress : prev));
+          setJobMessage(job.message || 'Merging PDFs...');
+          setJobState(job.status);
+
+          if (job.status === 'completed') {
+            isActive = false;
+            clearInterval(pollInterval);
+            clearTimeout(timeoutId);
+            setDownloadUrl(resolveDownloadUrl(job.downloadUrl, API_URL));
+            setJobProgress(100);
+            setJobMessage(job.message || 'Merge completed!');
+            setLoading(false);
+          } else if (job.status === 'failed') {
+            isActive = false;
+            clearInterval(pollInterval);
+            clearTimeout(timeoutId);
+            setError(job.error || 'Merge failed');
+            setJobMessage(job.error || 'Merge failed');
+            setLoading(false);
+          }
+        } catch (pollError) {
+          isActive = false;
           clearInterval(pollInterval);
-          const fullUrl = statusData.downloadUrl.startsWith('http') 
-            ? statusData.downloadUrl 
-            : `${API_URL}${statusData.downloadUrl}`;
-          setDownloadUrl(fullUrl);
-          setLoading(false);
-        } else if (statusData.status === 'failed') {
-          clearInterval(pollInterval);
-          setError(statusData.error || 'Merge failed');
+          clearTimeout(timeoutId);
+          setError(pollError instanceof Error ? pollError.message : 'Failed to fetch job status');
+          setJobMessage('Unable to track merge progress');
+          setJobState(null);
+          setJobProgress(null);
           setLoading(false);
         }
       }, 1000);
 
-      // Timeout after 5 minutes
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        if (loading) {
-          setError('Merge timed out');
-          setLoading(false);
+      timeoutId = setTimeout(() => {
+        if (!isActive) {
+          return;
         }
+        clearInterval(pollInterval);
+        setError('Merge timed out');
+        setJobMessage('Merge timed out');
+        setJobState(null);
+        setJobProgress(null);
+        setLoading(false);
       }, 300000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to merge PDFs');
+      setJobMessage('');
+      setJobState(null);
+      setJobProgress(null);
       setLoading(false);
     }
   };
@@ -214,9 +249,24 @@ export default function PdfMergerPage() {
           )}
 
           {loading && (
-            <div className="mt-4 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-              <span className="ml-3 text-gray-600">Merging PDFs...</span>
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">
+                  {jobMessage || 'Merging PDFs...'}
+                </span>
+                {typeof jobProgress === 'number' && (
+                  <span className="text-sm text-gray-600">{jobProgress}%</span>
+                )}
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="h-full bg-purple-600 transition-all duration-300"
+                  style={{ width: `${Math.min(Math.max(jobProgress ?? 10, 5), 100)}%` }}
+                ></div>
+              </div>
+              {jobState && (
+                <p className="text-xs text-gray-500 mt-2 capitalize">Status: {jobState}</p>
+              )}
             </div>
           )}
         </div>

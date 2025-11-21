@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { fetchJobStatus, resolveDownloadUrl } from '@/lib/jobStatus';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -57,33 +58,43 @@ export default function ImageCompressorPage() {
         throw new Error(data.error || 'Compression failed');
       }
 
-      // Poll for job status
       const jobId = data.jobId;
-      const pollInterval = setInterval(async () => {
-        const statusResponse = await fetch(`${API_URL}/job/${jobId}`);
-        const statusData = await statusResponse.json();
+      let isActive = true;
+      let timeoutId: ReturnType<typeof setTimeout>;
 
-        if (statusData.status === 'completed') {
+      const pollInterval = setInterval(async () => {
+        try {
+          const job = await fetchJobStatus(jobId, API_URL);
+
+          if (job.status === 'completed') {
+            isActive = false;
+            clearInterval(pollInterval);
+            clearTimeout(timeoutId);
+            setDownloadUrl(resolveDownloadUrl(job.downloadUrl, API_URL));
+            setLoading(false);
+          } else if (job.status === 'failed') {
+            isActive = false;
+            clearInterval(pollInterval);
+            clearTimeout(timeoutId);
+            setError(job.error || 'Compression failed');
+            setLoading(false);
+          }
+        } catch (pollError) {
+          isActive = false;
           clearInterval(pollInterval);
-          const fullUrl = statusData.downloadUrl.startsWith('http') 
-            ? statusData.downloadUrl 
-            : `${API_URL}${statusData.downloadUrl}`;
-          setDownloadUrl(fullUrl);
-          setLoading(false);
-        } else if (statusData.status === 'failed') {
-          clearInterval(pollInterval);
-          setError(statusData.error || 'Compression failed');
+          clearTimeout(timeoutId);
+          setError(pollError instanceof Error ? pollError.message : 'Failed to fetch job status');
           setLoading(false);
         }
       }, 1000);
 
-      // Timeout after 2 minutes
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        if (loading) {
-          setError('Compression timed out');
-          setLoading(false);
+      timeoutId = setTimeout(() => {
+        if (!isActive) {
+          return;
         }
+        clearInterval(pollInterval);
+        setError('Compression timed out');
+        setLoading(false);
       }, 120000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to compress image');

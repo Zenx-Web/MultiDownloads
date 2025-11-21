@@ -4,6 +4,7 @@ import { PDFDocument } from 'pdf-lib';
 import mammoth from 'mammoth';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import sharp from 'sharp';
+import archiver from 'archiver';
 import { updateJob } from './jobService';
 
 /**
@@ -331,43 +332,99 @@ export const mergePdfs = async (
 export const splitPdf = async (
   inputPath: string,
   jobId: string
-): Promise<string[]> => {
-  updateJob(jobId, {
-    status: 'processing',
-    progress: 10,
-    message: 'Reading PDF...',
-  });
+): Promise<string> => {
+  const generatedPages: string[] = [];
 
-  const pdfBuffer = fs.readFileSync(inputPath);
-  const pdfDoc = await PDFDocument.load(pdfBuffer);
-  const pageCount = pdfDoc.getPageCount();
-
-  const outputPaths: string[] = [];
-  const baseName = path.basename(inputPath, '.pdf');
-  const dirName = path.dirname(inputPath);
-
-  for (let i = 0; i < pageCount; i++) {
+  try {
     updateJob(jobId, {
-      progress: 10 + (i / pageCount) * 80,
-      message: `Splitting page ${i + 1} of ${pageCount}...`,
+      status: 'processing',
+      progress: 10,
+      message: 'Reading PDF...',
     });
 
-    const newPdf = await PDFDocument.create();
-    const [copiedPage] = await newPdf.copyPages(pdfDoc, [i]);
-    newPdf.addPage(copiedPage);
+    const pdfBuffer = fs.readFileSync(inputPath);
+    const pdfDoc = await PDFDocument.load(pdfBuffer);
+    const pageCount = pdfDoc.getPageCount();
 
-    const outputPath = path.join(dirName, `${baseName}_page_${i + 1}.pdf`);
-    const pdfBytes = await newPdf.save();
-    fs.writeFileSync(outputPath, pdfBytes);
-    outputPaths.push(outputPath);
+    if (pageCount === 0) {
+      throw new Error('The uploaded PDF does not contain any pages');
+    }
+
+    const baseName = path.basename(inputPath, '.pdf');
+    const dirName = path.dirname(inputPath);
+
+    for (let i = 0; i < pageCount; i++) {
+      updateJob(jobId, {
+        progress: 10 + (i / pageCount) * 70,
+        message: `Creating page ${i + 1} of ${pageCount}...`,
+      });
+
+      const newPdf = await PDFDocument.create();
+      const [copiedPage] = await newPdf.copyPages(pdfDoc, [i]);
+      newPdf.addPage(copiedPage);
+
+      const outputPath = path.join(dirName, `${baseName}_page_${i + 1}.pdf`);
+      const pdfBytes = await newPdf.save();
+      fs.writeFileSync(outputPath, pdfBytes);
+      generatedPages.push(outputPath);
+    }
+
+    updateJob(jobId, {
+      progress: 85,
+      message: 'Packaging split pages...',
+    });
+
+    const zipPath = path.join(dirName, `${baseName}_pages_${jobId}.zip`);
+    fs.mkdirSync(path.dirname(zipPath), { recursive: true });
+
+    await new Promise<void>((resolve, reject) => {
+      const output = fs.createWriteStream(zipPath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+
+      output.on('close', () => resolve());
+      output.on('error', (error: unknown) => reject(error));
+      archive.on('error', (error: unknown) => reject(error));
+
+      archive.pipe(output);
+
+      for (const pagePath of generatedPages) {
+        archive.file(pagePath, { name: path.basename(pagePath) });
+      }
+
+      archive.finalize();
+    });
+
+    updateJob(jobId, {
+      status: 'completed',
+      progress: 100,
+      filePath: zipPath,
+      downloadUrl: `/api/download/file/${jobId}`,
+      message: `Split into ${generatedPages.length} page${generatedPages.length === 1 ? '' : 's'} successfully!`,
+      metadata: {
+        pageCount: generatedPages.length,
+        archiveName: path.basename(zipPath),
+      },
+    });
+
+    // Clean up individual page PDFs after zipping to save space
+    for (const pagePath of generatedPages) {
+      try {
+        if (fs.existsSync(pagePath)) {
+          fs.unlinkSync(pagePath);
+        }
+      } catch (cleanupError) {
+        console.warn('Failed to remove temporary split page:', cleanupError);
+      }
+    }
+
+    return zipPath;
+  } catch (error) {
+    updateJob(jobId, {
+      status: 'failed',
+      error: error instanceof Error ? error.message : 'PDF split failed',
+    });
+    throw error;
   }
-
-  updateJob(jobId, {
-    progress: 100,
-    message: 'PDF split successfully!',
-  });
-
-  return outputPaths;
 };
 
 /**

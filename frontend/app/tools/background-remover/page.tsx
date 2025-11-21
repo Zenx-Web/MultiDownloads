@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { fetchJobStatus, resolveDownloadUrl } from '@/lib/jobStatus';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -41,25 +42,50 @@ export default function BackgroundRemoverPage() {
       });
 
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Background removal failed');
+      }
+
       const jobId = data.jobId;
 
-      const pollInterval = setInterval(async () => {
-        const statusResponse = await fetch(`${API_URL}/job/${jobId}`);
-        const statusData = await statusResponse.json();
+      let isActive = true;
+      let timeoutId: ReturnType<typeof setTimeout>;
 
-        if (statusData.status === 'completed') {
+      const pollInterval = setInterval(async () => {
+        try {
+          const job = await fetchJobStatus(jobId, API_URL);
+
+          if (job.status === 'completed') {
+            isActive = false;
+            clearInterval(pollInterval);
+            clearTimeout(timeoutId);
+            setDownloadUrl(resolveDownloadUrl(job.downloadUrl, API_URL));
+            setLoading(false);
+          } else if (job.status === 'failed') {
+            isActive = false;
+            clearInterval(pollInterval);
+            clearTimeout(timeoutId);
+            setError(job.error || 'Background removal failed');
+            setLoading(false);
+          }
+        } catch (pollError) {
+          isActive = false;
           clearInterval(pollInterval);
-          const fullUrl = statusData.downloadUrl.startsWith('http') 
-            ? statusData.downloadUrl 
-            : `${API_URL}${statusData.downloadUrl}`;
-          setDownloadUrl(fullUrl);
-          setLoading(false);
-        } else if (statusData.status === 'failed') {
-          clearInterval(pollInterval);
-          setError(statusData.error || 'Background removal failed');
+          clearTimeout(timeoutId);
+          setError(pollError instanceof Error ? pollError.message : 'Failed to fetch job status');
           setLoading(false);
         }
       }, 1000);
+
+      timeoutId = setTimeout(() => {
+        if (!isActive) {
+          return;
+        }
+        clearInterval(pollInterval);
+        setError('Background removal timed out');
+        setLoading(false);
+      }, 180000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove background');
       setLoading(false);

@@ -19,6 +19,8 @@ router.use('/media', mediaRoutes);
 
 // Status endpoint at root level
 router.get('/status/:jobId', getJobStatus);
+// Backwards compatibility for older frontend polling endpoints
+router.get('/job/:jobId', getJobStatus);
 
 // Health check endpoint
 router.get('/health', (_req, res) => {

@@ -1,12 +1,19 @@
 import { Request, Response } from 'express';
 import multer from 'multer';
-import { createJob } from '../services/jobService';
+import * as fs from 'fs';
+import * as path from 'path';
+import { createJob, updateJob } from '../services/jobService';
 import * as utilityService from '../services/utilityService';
 
 // Multer storage configuration
+const uploadsDir = path.resolve(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
-    cb(null, 'uploads/');
+    cb(null, uploadsDir);
   },
   filename: (_req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`);
@@ -34,8 +41,12 @@ export const generateQRCodeHandler = async (req: Request, res: Response): Promis
     res.json({ success: true, jobId: job.id });
 
     // Process in background
-    utilityService.generateQRCode(text, Number(size), job.id).catch((error) => {
+    utilityService.generateQRCode(text, Number(size), job.id).catch((error: Error) => {
       console.error('QR generation error:', error);
+      updateJob(job.id, {
+        status: 'failed',
+        error: error.message,
+      });
     });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to generate QR code' });
@@ -63,8 +74,12 @@ export const generateHashHandler = [
       // Process in background
       utilityService
         .generateHash(file?.path || null, text || null, algorithm, job.id)
-        .catch((error) => {
+        .catch((error: Error) => {
           console.error('Hash generation error:', error);
+          updateJob(job.id, {
+            status: 'failed',
+            error: error.message,
+          });
         });
     } catch (error) {
       res.status(500).json({ success: false, error: 'Failed to generate hash' });
@@ -88,8 +103,12 @@ export const formatTextHandler = async (req: Request, res: Response): Promise<vo
     res.json({ success: true, jobId: job.id });
 
     // Process in background
-    utilityService.formatText(text, operation, job.id).catch((error) => {
+    utilityService.formatText(text, operation, job.id).catch((error: Error) => {
       console.error('Text formatting error:', error);
+      updateJob(job.id, {
+        status: 'failed',
+        error: error.message,
+      });
     });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to format text' });
@@ -117,8 +136,12 @@ export const extractColorPaletteHandler = [
       // Process in background
       utilityService
         .extractColorPalette(file.path, Number(colorCount), job.id)
-        .catch((error) => {
+        .catch((error: Error) => {
           console.error('Color extraction error:', error);
+          updateJob(job.id, {
+            status: 'failed',
+            error: error.message,
+          });
         });
     } catch (error) {
       res.status(500).json({ success: false, error: 'Failed to extract colors' });
@@ -144,8 +167,12 @@ export const generateFaviconHandler = [
       res.json({ success: true, jobId: job.id });
 
       // Process in background
-      utilityService.generateFavicon(file.path, job.id).catch((error) => {
+      utilityService.generateFavicon(file.path, job.id).catch((error: Error) => {
         console.error('Favicon generation error:', error);
+        updateJob(job.id, {
+          status: 'failed',
+          error: error.message,
+        });
       });
     } catch (error) {
       res.status(500).json({ success: false, error: 'Failed to generate favicon' });

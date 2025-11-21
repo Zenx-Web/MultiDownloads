@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import axios from 'axios';
+import ProgressTracker from '@/components/ProgressTracker';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -14,14 +15,16 @@ export default function ImageConverterPage() {
   const [quality, setQuality] = useState('80');
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState('');
-  const [downloadUrl, setDownloadUrl] = useState('');
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState('');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
       setError('');
-      setDownloadUrl('');
+      setJobId(null);
+      setStatusMessage('');
 
       // Create preview
       const reader = new FileReader();
@@ -40,9 +43,11 @@ export default function ImageConverterPage() {
 
     setIsConverting(true);
     setError('');
+    setStatusMessage('');
+    setJobId(null);
 
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('file', file);
     formData.append('targetFormat', targetFormat);
     if (width) formData.append('width', width);
     if (height) formData.append('height', height);
@@ -53,14 +58,27 @@ export default function ImageConverterPage() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      if (response.data.success) {
-        setDownloadUrl(response.data.downloadUrl);
+      if (response.data?.success && response.data?.data?.jobId) {
+        setJobId(response.data.data.jobId);
+        setStatusMessage(
+          response.data.data.message || 'Image conversion started. Track the job below.'
+        );
+      } else {
+        throw new Error(response.data?.error || 'Conversion failed');
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Conversion failed');
     } finally {
       setIsConverting(false);
     }
+  };
+
+  const handleReset = () => {
+    setJobId(null);
+    setStatusMessage('');
+    setError('');
+    setFile(null);
+    setPreview('');
   };
 
   return (
@@ -183,6 +201,12 @@ export default function ImageConverterPage() {
                   </div>
                 </div>
 
+                {statusMessage && (
+                  <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
+                    {statusMessage}
+                  </div>
+                )}
+
                 {/* Error Message */}
                 {error && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
@@ -198,23 +222,16 @@ export default function ImageConverterPage() {
                 >
                   {isConverting ? 'Converting...' : 'Convert Image'}
                 </button>
-
-                {/* Download Link */}
-                {downloadUrl && (
-                  <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                    <p className="text-green-700 text-sm mb-2">Conversion complete!</p>
-                    <a
-                      href={`${API_URL}${downloadUrl}`}
-                      className="inline-block bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
-                    >
-                      Download Image
-                    </a>
-                  </div>
-                )}
               </div>
             </div>
           </div>
         </div>
+
+        {jobId && (
+          <div className="max-w-4xl mx-auto mt-10">
+            <ProgressTracker jobId={jobId} onReset={handleReset} />
+          </div>
+        )}
 
         {/* Features Section */}
         <section className="max-w-5xl mx-auto mt-16">

@@ -8,6 +8,31 @@ import { ApiError } from '../middlewares/errorHandler';
 import { config } from '../config';
 import { incrementDownloadCount, decrementConcurrentCount } from '../middlewares/tierLimits';
 
+const RESOLUTION_PRESETS: Record<string, string> = {
+  '360p': '640x360',
+  '480p': '854x480',
+  '720p': '1280x720',
+  '1080p': '1920x1080',
+  '1440p': '2560x1440',
+  '2160p': '3840x2160',
+};
+
+const normalizeResolution = (value?: string): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.toString().trim();
+  const lower = trimmed.toLowerCase();
+
+  if (RESOLUTION_PRESETS[lower]) {
+    return RESOLUTION_PRESETS[lower];
+  }
+
+  if (/^\d{2,4}x\d{2,4}$/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return trimmed;
+};
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: config.storage.tempDir,
@@ -48,7 +73,9 @@ export const convertVideoHandler = async (
     incrementDownloadCount(req);
 
     // Process conversion asynchronously
-    processVideoConversion(job.id, file.path, targetFormat, targetResolution, req)
+    const normalizedResolution = normalizeResolution(targetResolution);
+
+    processVideoConversion(job.id, file.path, targetFormat, normalizedResolution, req)
       .catch((error) => {
         updateJob(job.id, {
           status: 'failed',
