@@ -285,7 +285,8 @@ export const downloadYouTubeVideo = async (
  */
 export const downloadInstagramVideo = async (
   url: string,
-  jobId: string
+  jobId: string,
+  userCookies?: string
 ): Promise<string> => {
   try {
     updateJob(jobId, { progress: 10, status: 'processing', message: 'Initializing Instagram downloader...' });
@@ -293,10 +294,27 @@ export const downloadInstagramVideo = async (
     // Initialize yt-dlp (it supports Instagram)
     const ytDlp = await ensureYtDlp();
 
+    // Setup cookies for Instagram
+    let cookiesPath: string | undefined;
+    
+    if (userCookies) {
+      // Use user-provided cookies
+      const tempCookiePath = path.join(config.storage.tempDir, `user_cookies_${jobId}.txt`);
+      fs.writeFileSync(tempCookiePath, userCookies);
+      cookiesPath = tempCookiePath;
+      console.log('✓ Using user-provided cookies for Instagram');
+    }
+
     updateJob(jobId, { progress: 20, message: 'Fetching Instagram media...' });
 
-    // Get video info
-    const info = await ytDlp.getVideoInfo(url);
+    // Get video info with cookies if available
+    const infoOptions: string[] = ['--dump-json', '--no-warnings'];
+    if (cookiesPath) {
+      infoOptions.push('--cookies', cookiesPath);
+    }
+    
+    const infoJson = await ytDlp.execPromise([url, ...infoOptions]);
+    const info = JSON.parse(infoJson);
     const title = sanitizeFilename(info.title || 'instagram_video');
     const outputFilename = `${jobId}_${title}`;
     const outputPath = path.join(config.storage.tempDir, `${outputFilename}.mp4`);
@@ -315,6 +333,11 @@ export const downloadInstagramVideo = async (
       '-o', path.join(config.storage.tempDir, `${outputFilename}.%(ext)s`),
       '-f', 'best',
     ];
+    
+    // Add cookies if available
+    if (cookiesPath) {
+      downloadOptions.push('--cookies', cookiesPath);
+    }
 
     const ytDlpProcess = ytDlp.exec([url, ...downloadOptions]);
     
@@ -581,7 +604,7 @@ export const downloadMedia = async (
       return downloadYouTubeVideo(url, quality, format, jobId, userCookies);
     
     case Platform.INSTAGRAM:
-      return downloadInstagramVideo(url, jobId);
+      return downloadInstagramVideo(url, jobId, userCookies);
     
     case Platform.FACEBOOK:
       return downloadFacebookVideo(url, jobId);
