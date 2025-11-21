@@ -73,39 +73,199 @@ const saveUserCookies = (cookies: string): void => {
   }
 };
 
-/**
- * Ensure cookies are available for YouTube downloads
- * Priority: 1) Environment cookies, 2) User-provided cookies (stored fallback), 3) None
- */
-const ensureCookies = (): { hasCookies: boolean; cookiesPath: string } => {
-  const envCookiesPath = path.join(__dirname, '../../cookies.txt');
-  const userCookiesPath = path.join(__dirname, '../../user_cookies.txt');
-  
-  // Priority 1: Environment cookies (most trusted)
-  if (fs.existsSync(envCookiesPath)) {
-    console.log('✓ Using environment cookies.txt file');
-    return { hasCookies: true, cookiesPath: envCookiesPath };
+type CookieCandidate = {
+  label: string;
+  path?: string;
+  ephemeral?: boolean;
+};
+
+const backendRoot = path.resolve(__dirname, '../../');
+const repoRoot = path.resolve(__dirname, '../../../');
+
+const COOKIE_RETRY_PATTERNS = [
+  'sign in to confirm',
+  'sign in to view',
+  'sign in',
+  'login required',
+  'log in',
+  'not a bot',
+  'verify you are human',
+  'captcha',
+  'consent required',
+  'account issue',
+  'this video may be inappropriate',
+  'age-restricted',
+  'private video',
+  'http error 403',
+  'http error 429',
+  'too many requests',
+  'forbidden',
+  'quota exceeded',
+  'temporarily blocked',
+];
+
+const normalizeCookiePath = (filePath: string): string => {
+  const trimmed = filePath.trim();
+  if (!trimmed) {
+    return trimmed;
   }
-  
-  // Priority 2: Try to create from environment variable
-  if (process.env.YOUTUBE_COOKIES) {
-    try {
-      fs.writeFileSync(envCookiesPath, process.env.YOUTUBE_COOKIES);
-      console.log('✓ Created cookies.txt from YOUTUBE_COOKIES environment variable');
-      return { hasCookies: true, cookiesPath: envCookiesPath };
-    } catch (error) {
-      console.warn('✗ Failed to write cookies from env:', error);
+  if (path.isAbsolute(trimmed)) {
+    return trimmed;
+  }
+  return path.resolve(backendRoot, trimmed);
+};
+
+const parseEnvCookieFiles = (): string[] => {
+  const envValues: string[] = [];
+
+  if (process.env.YOUTUBE_COOKIES_FILE) {
+    envValues.push(process.env.YOUTUBE_COOKIES_FILE);
+  }
+
+  const listVars = [
+    process.env.YOUTUBE_COOKIE_FILES,
+    process.env.YOUTUBE_COOKIES_FILES,
+    process.env.YOUTUBE_COOKIES_PATHS,
+  ];
+
+  for (const value of listVars) {
+    if (value) {
+      envValues.push(...value.split(/[;,]/g));
     }
   }
-  
-  // Priority 3: Use stored user cookies as fallback
-  if (fs.existsSync(userCookiesPath)) {
-    console.log('✓ Using stored user-provided cookies as fallback');
-    return { hasCookies: true, cookiesPath: userCookiesPath };
+
+  return envValues
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+};
+
+const buildCookieCandidates = (jobId?: string, userCookies?: string): CookieCandidate[] => {
+  const candidates: CookieCandidate[] = [];
+  const seen = new Set<string>();
+
+  const addCandidate = (label: string, filePath?: string, ephemeral = false) => {
+    if (filePath) {
+      const normalized = normalizeCookiePath(filePath);
+      if (!fs.existsSync(normalized) || seen.has(normalized)) {
+        return;
+      }
+      seen.add(normalized);
+      candidates.push({ label, path: normalized, ephemeral });
+      return;
+    }
+
+    if (!candidates.some((candidate) => !candidate.path)) {
+      candidates.push({ label });
+    }
+  };
+
+  if (userCookies && userCookies.trim().length > 0) {
+    if (!fs.existsSync(config.storage.tempDir)) {
+      fs.mkdirSync(config.storage.tempDir, { recursive: true });
+    }
+
+    const safeJobId = jobId || `manual_${Date.now()}`;
+    const tempCookiePath = path.join(config.storage.tempDir, `user_cookies_${safeJobId}.txt`);
+    fs.writeFileSync(tempCookiePath, userCookies);
+    addCandidate('user-supplied cookies', tempCookiePath, true);
   }
-  
-  console.warn('⚠ No YouTube cookies available - may encounter bot detection');
-  return { hasCookies: false, cookiesPath: envCookiesPath };
+
+  for (const envPath of parseEnvCookieFiles()) {
+    const normalized = normalizeCookiePath(envPath);
+    addCandidate(`env:${path.basename(normalized)}`, normalized);
+  }
+
+  addCandidate('backend cookies.txt', path.join(backendRoot, 'cookies.txt'));
+  addCandidate('stored user cookies', path.join(backendRoot, 'user_cookies.txt'));
+  addCandidate('repo cookies_update.txt', path.join(repoRoot, 'cookies_update.txt'));
+  addCandidate('repo cookies_music.txt', path.join(repoRoot, 'cookies_music.txt'));
+  addCandidate('repo youtube_cookies_fresh.txt', path.join(repoRoot, 'youtube_cookies_fresh.txt'));
+
+  addCandidate('no cookies');
+
+  if (candidates.length === 0) {
+    candidates.push({ label: 'no cookies' });
+  }
+
+  return candidates;
+};
+
+const cleanupCookieCandidates = (candidates: CookieCandidate[]): void => {
+  for (const candidate of candidates) {
+    if (candidate.ephemeral && candidate.path) {
+      try {
+        if (fs.existsSync(candidate.path)) {
+          fs.unlinkSync(candidate.path);
+        }
+      } catch (error) {
+        console.warn('⚠ Failed to clean up temporary cookie file:', error);
+      }
+    }
+  }
+};
+
+const extractYtDlpErrorMessage = (error: unknown): string => {
+  if (!error) {
+    return 'Unknown error';
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  if (error instanceof Error) {
+    const stderr = (error as any)?.stderr;
+    if (stderr) {
+      return `${error.message}\n${stderr}`.trim();
+    }
+    return error.message;
+  }
+
+  if (typeof error === 'object') {
+    const stderr = (error as any)?.stderr;
+    const message = (error as any)?.message;
+    if (stderr) {
+      return String(stderr);
+    }
+    if (message) {
+      return String(message);
+    }
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return 'Unrecognized yt-dlp error';
+  }
+};
+
+const shouldRetryWithNextCookies = (message: string): boolean => {
+  if (!message) {
+    return false;
+  }
+  const lowered = message.toLowerCase();
+  return COOKIE_RETRY_PATTERNS.some((pattern) => lowered.includes(pattern));
+};
+
+const cleanupPartialJobFiles = (jobId: string): void => {
+  try {
+    if (!fs.existsSync(config.storage.tempDir)) {
+      return;
+    }
+
+    const files = fs.readdirSync(config.storage.tempDir);
+    for (const file of files) {
+      if (file.startsWith(`${jobId}_`)) {
+        try {
+          fs.unlinkSync(path.join(config.storage.tempDir, file));
+        } catch (error) {
+          console.warn('⚠ Failed to remove partial download file:', error);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('⚠ Failed to clean partial job files:', error);
+  }
 };
 
 /**
@@ -118,10 +278,11 @@ export const downloadYouTubeVideo = async (
   jobId: string,
   userCookies?: string
 ): Promise<string> => {
+  const cookieCandidates = buildCookieCandidates(jobId, userCookies);
+
   try {
     updateJob(jobId, { progress: 5, status: 'processing', message: 'Validating YouTube URL...' });
 
-    // Basic YouTube URL validation (includes YouTube Music)
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|music\.youtube\.com)\/.+$/;
     if (!youtubeRegex.test(url)) {
       throw new Error('Invalid YouTube URL');
@@ -129,210 +290,214 @@ export const downloadYouTubeVideo = async (
 
     updateJob(jobId, { progress: 10, message: 'Initializing downloader...' });
 
-    // Initialize yt-dlp with auto-download
     const ytDlp = await ensureYtDlp();
-    
-    // Ensure temp directory exists
+
     if (!fs.existsSync(config.storage.tempDir)) {
       fs.mkdirSync(config.storage.tempDir, { recursive: true });
     }
 
-    // Setup cookies for YouTube
-    let cookiesPath: string | undefined;
-    let hasCookies = false;
-    
-    if (userCookies) {
-      // Use user-provided cookies
-      const tempCookiePath = path.join(config.storage.tempDir, `user_cookies_${jobId}.txt`);
-      fs.writeFileSync(tempCookiePath, userCookies);
-      cookiesPath = tempCookiePath;
-      hasCookies = true;
-      console.log('✓ Using user-provided cookies for download');
-      
-      // Save successful user cookies for future use (stored after download succeeds)
-      // This will be done in the success handler
-    } else {
-      // Fall back to environment cookies or stored user cookies
-      const envCookies = ensureCookies();
-      cookiesPath = envCookies.cookiesPath;
-      hasCookies = envCookies.hasCookies;
-    }
+    const attemptErrors: string[] = [];
+    let lastErrorMessage = '';
 
-    // Get video info with bypass options
-    updateJob(jobId, { progress: 15, message: 'Fetching video information...' });
-    
-    const infoOptions = [
-      '--dump-json',
-      '--no-check-certificate',
-      '--no-warnings',
-      // Use Android client as primary (most reliable for bot detection)
-      '--extractor-args', 'youtube:player_client=android,ios,web,mweb,tv_embedded',
-      '--extractor-args', 'youtube:skip=translated_subs',
-      // Android app user-agent
-      '--user-agent', 'com.google.android.youtube/19.09.37 (Linux; U; Android 13; en_US) gzip',
-      // Additional headers to mimic real app
-      '--add-header', 'Accept-Language:en-US,en;q=0.9',
-      '--add-header', 'Accept-Encoding:gzip, deflate',
-      '--add-header', 'Accept:*/*',
-      '--add-header', 'Connection:keep-alive',
-      '--geo-bypass',
-      '--force-ipv4',
-      '--socket-timeout', '30',
-      '--extractor-retries', '10',
-      '--fragment-retries', '10',
-      '--retry-sleep', '3',
-      // Enable embed workaround for restricted videos
-      '--extractor-args', 'youtube:player_skip=webpage,configs',
-    ];
-    
-    if (hasCookies) {
-      infoOptions.push('--cookies', cookiesPath);
-    }
-    
-    const infoJson = await ytDlp.execPromise([url, ...infoOptions]);
-    const info = JSON.parse(infoJson);
-    
-    const title = sanitizeFilename(info.title || 'video');
-    const outputFilename = `${jobId}_${title}`;
-    const outputPath = path.join(config.storage.tempDir, `${outputFilename}.${format}`);
+    for (let index = 0; index < cookieCandidates.length; index += 1) {
+      const candidate = cookieCandidates[index];
+      const isLastAttempt = index === cookieCandidates.length - 1;
 
-    updateJob(jobId, { progress: 20, message: `Downloading: ${info.title?.substring(0, 50) || 'video'}...` });
+      try {
+        cleanupPartialJobFiles(jobId);
 
-    // Configure download options with enhanced bot bypass
-    const downloadOptions: string[] = [
-      '--progress',
-      '--newline',
-      '--no-check-certificate',
-      '--no-warnings',
-      // Android client first for best bot detection bypass
-      '--extractor-args', 'youtube:player_client=android,ios,web,mweb,tv_embedded',
-      '--extractor-args', 'youtube:skip=translated_subs',
-      '--extractor-args', 'youtube:player_skip=webpage,configs',
-      // Android app user-agent
-      '--user-agent', 'com.google.android.youtube/19.09.37 (Linux; U; Android 13; en_US) gzip',
-      // Browser-like headers
-      '--add-header', 'Accept-Language:en-US,en;q=0.9',
-      '--add-header', 'Accept-Encoding:gzip, deflate',
-      '--add-header', 'Accept:*/*',
-      '--add-header', 'Connection:keep-alive',
-      '--add-header', 'Sec-Fetch-Mode:navigate',
-      '--geo-bypass',
-      '--force-ipv4',
-      '--sleep-requests', '1',
-      '--max-sleep-interval', '5',
-      '--extractor-retries', '15',
-      '--fragment-retries', '15',
-      '--retry-sleep', '5',
-      '--socket-timeout', '30',
-      '--throttled-rate', '100K',
-      // Age gate bypass
-      '--age-limit', '0',
-      '-o', path.join(config.storage.tempDir, `${outputFilename}.%(ext)s`),
-    ];
+        const attemptLabel = candidate.path ? candidate.label : 'no cookies';
+        console.log(`→ Attempting YouTube download with ${attemptLabel}`);
 
-    // Add cookies if available
-    if (hasCookies) {
-      downloadOptions.push('--cookies', cookiesPath);
-    }
+        updateJob(jobId, { progress: 15, message: `Fetching video information (${attemptLabel})...` });
 
-    if (format === 'mp3') {
-      // Extract audio only
-      downloadOptions.push(
-        '-x',
-        '--audio-format', 'mp3',
-        '--audio-quality', '0'
-      );
-    } else if (format === 'mp4') {
-      // Download video with quality constraint
-      const qualityMap: { [key: string]: string } = {
-        '144p': 'worst[height<=144]',
-        '240p': 'worst[height<=240]',
-        '360p': 'best[height<=360]',
-        '480p': 'best[height<=480]',
-        '720p': 'best[height<=720]',
-        '1080p': 'best[height<=1080]',
-      };
-      
-      const formatSelector = qualityMap[quality] || 'best[height<=720]';
-      downloadOptions.push(
-        '-f', `${formatSelector}/best`,
-        '--merge-output-format', 'mp4'
-      );
-    }
+        const infoOptions: string[] = [
+          '--dump-json',
+          '--no-check-certificate',
+          '--no-warnings',
+          '--extractor-args', 'youtube:player_client=android,ios,web,mweb,tv_embedded',
+          '--extractor-args', 'youtube:skip=translated_subs',
+          '--user-agent', 'com.google.android.youtube/19.09.37 (Linux; U; Android 13; en_US) gzip',
+          '--add-header', 'Accept-Language:en-US,en;q=0.9',
+          '--add-header', 'Accept-Encoding:gzip, deflate',
+          '--add-header', 'Accept:*/*',
+          '--add-header', 'Connection:keep-alive',
+          '--geo-bypass',
+          '--force-ipv4',
+          '--socket-timeout', '30',
+          '--extractor-retries', '10',
+          '--fragment-retries', '10',
+          '--retry-sleep', '3',
+          '--extractor-args', 'youtube:player_skip=webpage,configs',
+        ];
 
-    // Execute download with progress tracking
-    const ytDlpProcess = ytDlp.exec([url, ...downloadOptions]);
-    
-    let lastProgress = 20;
-    
-    return new Promise((resolve, reject) => {
-      ytDlpProcess.on('progress', (progress) => {
-        if (progress.percent) {
-          const downloadProgress = Math.min(Math.floor(progress.percent * 0.7) + 20, 90);
-          if (downloadProgress > lastProgress) {
-            lastProgress = downloadProgress;
-            updateJob(jobId, { 
-              progress: downloadProgress, 
-              status: 'processing',
-              message: `Downloading... ${progress.percent.toFixed(1)}%`
-            });
-          }
+        if (candidate.path) {
+          infoOptions.push('--cookies', candidate.path);
         }
-      });
 
-      ytDlpProcess.on('ytDlpEvent', (eventType, eventData) => {
-        if (eventType === 'download' && eventData) {
-          console.log('Download event:', eventData);
+        const infoJson = await ytDlp.execPromise([url, ...infoOptions]);
+        const info = JSON.parse(infoJson);
+
+        const title = sanitizeFilename(info.title || 'video');
+        const outputFilename = `${jobId}_${title}`;
+        const expectedOutputPath = path.join(config.storage.tempDir, `${outputFilename}.${format}`);
+
+        updateJob(jobId, {
+          progress: 20,
+          message: `Downloading: ${info.title?.substring(0, 50) || 'video'}...`,
+        });
+
+        const downloadOptions: string[] = [
+          '--progress',
+          '--newline',
+          '--no-check-certificate',
+          '--no-warnings',
+          '--extractor-args', 'youtube:player_client=android,ios,web,mweb,tv_embedded',
+          '--extractor-args', 'youtube:skip=translated_subs',
+          '--extractor-args', 'youtube:player_skip=webpage,configs',
+          '--user-agent', 'com.google.android.youtube/19.09.37 (Linux; U; Android 13; en_US) gzip',
+          '--add-header', 'Accept-Language:en-US,en;q=0.9',
+          '--add-header', 'Accept-Encoding:gzip, deflate',
+          '--add-header', 'Accept:*/*',
+          '--add-header', 'Connection:keep-alive',
+          '--add-header', 'Sec-Fetch-Mode:navigate',
+          '--geo-bypass',
+          '--force-ipv4',
+          '--sleep-requests', '1',
+          '--sleep-interval', '1',
+          '--max-sleep-interval', '5',
+          '--extractor-retries', '15',
+          '--fragment-retries', '15',
+          '--retry-sleep', '5',
+          '--socket-timeout', '30',
+          '--throttled-rate', '100K',
+          '--age-limit', '0',
+          '-o', path.join(config.storage.tempDir, `${outputFilename}.%(ext)s`),
+        ];
+
+        if (candidate.path) {
+          downloadOptions.push('--cookies', candidate.path);
         }
-      });
 
-      ytDlpProcess.on('close', (code) => {
-        if (code === 0) {
-          updateJob(jobId, { progress: 95, message: 'Finalizing download...' });
-          
-          // If download succeeded with user cookies, save them for future use
-          if (userCookies) {
-            saveUserCookies(userCookies);
-          }
-          
-          // The file might have a different extension, find it
-          const files = fs.readdirSync(config.storage.tempDir);
-          const downloadedFile = files.find(f => f.startsWith(outputFilename));
-          
-          if (downloadedFile) {
-            const actualPath = path.join(config.storage.tempDir, downloadedFile);
-            
-            // Rename if needed to match expected format
-            if (actualPath !== outputPath) {
-              try {
-                fs.renameSync(actualPath, outputPath);
-                resolve(outputPath);
-              } catch (renameError) {
-                // If rename fails, just use the actual path
-                resolve(actualPath);
+        if (format === 'mp3') {
+          downloadOptions.push('-x', '--audio-format', 'mp3', '--audio-quality', '0');
+        } else if (format === 'mp4') {
+          const qualityMap: { [key: string]: string } = {
+            '144p': 'worst[height<=144]',
+            '240p': 'worst[height<=240]',
+            '360p': 'best[height<=360]',
+            '480p': 'best[height<=480]',
+            '720p': 'best[height<=720]',
+            '1080p': 'best[height<=1080]',
+          };
+
+          const formatSelector = qualityMap[quality] || 'best[height<=720]';
+          downloadOptions.push('-f', `${formatSelector}/best`, '--merge-output-format', 'mp4');
+        }
+
+        const ytDlpProcess = ytDlp.exec([url, ...downloadOptions]);
+
+        let lastProgress = 20;
+
+        const downloadedPath = await new Promise<string>((resolve, reject) => {
+          ytDlpProcess.on('progress', (progress) => {
+            if (progress.percent) {
+              const downloadProgress = Math.min(Math.floor(progress.percent * 0.7) + 20, 90);
+              if (downloadProgress > lastProgress) {
+                lastProgress = downloadProgress;
+                updateJob(jobId, {
+                  progress: downloadProgress,
+                  status: 'processing',
+                  message: `Downloading... ${progress.percent.toFixed(1)}%`,
+                });
+              }
+            }
+          });
+
+          ytDlpProcess.on('ytDlpEvent', (eventType, eventData) => {
+            if (eventType === 'download' && eventData) {
+              console.log('Download event:', eventData);
+            }
+          });
+
+          ytDlpProcess.on('close', (code) => {
+            if (code === 0) {
+              updateJob(jobId, { progress: 95, message: 'Finalizing download...' });
+
+              const files = fs.readdirSync(config.storage.tempDir);
+              const downloadedFile = files.find((file) => file.startsWith(outputFilename));
+
+              if (downloadedFile) {
+                const actualPath = path.join(config.storage.tempDir, downloadedFile);
+
+                if (actualPath !== expectedOutputPath) {
+                  try {
+                    fs.renameSync(actualPath, expectedOutputPath);
+                    resolve(expectedOutputPath);
+                  } catch {
+                    resolve(actualPath);
+                  }
+                } else {
+                  resolve(expectedOutputPath);
+                }
+              } else {
+                reject(new Error('Download completed but file not found'));
               }
             } else {
-              resolve(outputPath);
+              reject(new Error(`Download failed with exit code ${code}`));
             }
-          } else {
-            reject(new Error('Download completed but file not found'));
-          }
-        } else {
-          reject(new Error(`Download failed with exit code ${code}`));
-        }
-      });
+          });
 
-      ytDlpProcess.on('error', (error) => {
-        try {
-          if (fs.existsSync(outputPath)) {
-            fs.unlinkSync(outputPath);
-          }
-        } catch {}
-        reject(new Error(`YouTube download failed: ${error.message}`));
-      });
-    });
+          ytDlpProcess.on('error', (error) => {
+            try {
+              if (fs.existsSync(expectedOutputPath)) {
+                fs.unlinkSync(expectedOutputPath);
+              }
+            } catch (cleanupError) {
+              console.warn('⚠ Failed to clean up partial download:', cleanupError);
+            }
+            reject(new Error(`YouTube download failed: ${error.message}`));
+          });
+        });
+
+        if (userCookies && candidate.ephemeral) {
+          saveUserCookies(userCookies);
+        }
+
+        return downloadedPath;
+      } catch (attemptError) {
+        const message = extractYtDlpErrorMessage(attemptError);
+        lastErrorMessage = message;
+        attemptErrors.push(`[${candidate.label}] ${message}`);
+
+        if (!isLastAttempt && shouldRetryWithNextCookies(message)) {
+          console.warn(`✗ Attempt with ${candidate.label} failed: ${message}`);
+          updateJob(jobId, {
+            progress: 15,
+            message: 'Encountered bot detection. Retrying with alternate cookies...',
+          });
+          continue;
+        }
+
+        if (isLastAttempt) {
+          continue;
+        }
+
+        throw new Error(message);
+      }
+    }
+
+    const attemptedLabels = cookieCandidates.map((candidate) => candidate.label).join(', ');
+    const attemptSummary = attemptErrors.length > 0 ? attemptErrors.join(' | ') : 'None';
+    const finalMessage = lastErrorMessage || 'Unknown yt-dlp error';
+
+    throw new Error(
+      `Failed to download after trying ${cookieCandidates.length} cookie option(s). yt-dlp last reported: ${finalMessage}. Attempt summary: ${attemptSummary}. Tried cookie sources: ${attemptedLabels}`
+    );
   } catch (error) {
     throw new Error(`YouTube download failed: ${(error as Error).message}`);
+  } finally {
+    cleanupCookieCandidates(cookieCandidates);
   }
 };
 
@@ -574,85 +739,109 @@ export const getMediaInfo = async (
   userCookies?: string
 ): Promise<any> => {
   const ytDlp = await ensureYtDlp();
-  
+
+  const isYouTube = url.includes('youtube.com') || url.includes('youtu.be') || url.includes('music.youtube.com');
+  const cookieCandidates = isYouTube ? buildCookieCandidates(`info_${Date.now()}`, userCookies) : [];
+
+  const formatMediaInfo = (parsed: any) => ({
+    title: parsed.title,
+    thumbnail: parsed.thumbnail,
+    duration: parsed.duration,
+    uploader: parsed.uploader || parsed.channel,
+    formats: parsed.formats?.map((f: any) => ({
+      formatId: f.format_id,
+      ext: f.ext,
+      quality: f.format_note || f.quality,
+      resolution: f.resolution,
+      filesize: f.filesize,
+      vcodec: f.vcodec,
+      acodec: f.acodec,
+    })) || [],
+  });
+
   try {
-    // Use appropriate bot bypass options based on URL
-    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be') || url.includes('music.youtube.com');
-    
-    const infoOptions = [
+    const baseInfoOptions = [
       '--dump-json',
       '--no-check-certificate',
       '--no-warnings',
     ];
 
-    // Add platform-specific options
-    if (isYouTube) {
-      // Check for user-provided cookies first, then fall back to environment cookies
-      let cookiesPath: string | undefined;
-      
-      if (userCookies) {
-        // Save user cookies to temporary file
-        const tempCookiePath = path.join(config.storage.tempDir, `user_cookies_${Date.now()}.txt`);
-        fs.writeFileSync(tempCookiePath, userCookies);
-        cookiesPath = tempCookiePath;
-        console.log('✓ Using user-provided cookies');
-      } else {
-        const { hasCookies, cookiesPath: envCookiesPath } = ensureCookies();
-        if (hasCookies) {
-          cookiesPath = envCookiesPath;
-        }
-      }
-      
-      infoOptions.push(
-        // Android client first for best bot detection bypass
-        '--extractor-args', 'youtube:player_client=android,ios,web,mweb,tv_embedded',
-        '--extractor-args', 'youtube:skip=translated_subs',
-        '--extractor-args', 'youtube:player_skip=webpage,configs',
-        '--user-agent', 'com.google.android.youtube/19.09.37 (Linux; U; Android 13; en_US) gzip',
-        '--add-header', 'Accept-Language:en-US,en;q=0.9',
-        '--add-header', 'Accept-Encoding:gzip, deflate',
-        '--add-header', 'Accept:*/*',
-        '--add-header', 'Connection:keep-alive',
-        '--geo-bypass',
-        '--force-ipv4',
-        '--socket-timeout', '30',
-        '--extractor-retries', '10',
-        '--fragment-retries', '10',
-        '--retry-sleep', '3'
-      );
-      
-      // Add cookies if available
-      if (cookiesPath) {
-        infoOptions.push('--cookies', cookiesPath);
-      }
-    } else {
-      // For other platforms (Facebook, Instagram), use generic user agent
-      infoOptions.push(
-        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      );
+    if (!isYouTube) {
+      const infoOptions = [
+        ...baseInfoOptions,
+        '--user-agent',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      ];
+
+      const info = await ytDlp.execPromise([url, ...infoOptions]);
+      const parsed = JSON.parse(info);
+      return formatMediaInfo(parsed);
     }
-    
-    const info = await ytDlp.execPromise([url, ...infoOptions]);
-    const parsed = JSON.parse(info);
-    
-    // Extract relevant information
-    return {
-      title: parsed.title,
-      thumbnail: parsed.thumbnail,
-      duration: parsed.duration,
-      uploader: parsed.uploader || parsed.channel,
-      formats: parsed.formats?.map((f: any) => ({
-        formatId: f.format_id,
-        ext: f.ext,
-        quality: f.format_note || f.quality,
-        resolution: f.resolution,
-        filesize: f.filesize,
-        vcodec: f.vcodec,
-        acodec: f.acodec,
-      })) || [],
-    };
+
+    const attemptErrors: string[] = [];
+    let lastErrorMessage = '';
+
+    for (let index = 0; index < cookieCandidates.length; index += 1) {
+      const candidate = cookieCandidates[index];
+      const isLastAttempt = index === cookieCandidates.length - 1;
+
+      try {
+        const infoOptions = [
+          ...baseInfoOptions,
+          '--extractor-args', 'youtube:player_client=android,ios,web,mweb,tv_embedded',
+          '--extractor-args', 'youtube:skip=translated_subs',
+          '--extractor-args', 'youtube:player_skip=webpage,configs',
+          '--user-agent', 'com.google.android.youtube/19.09.37 (Linux; U; Android 13; en_US) gzip',
+          '--add-header', 'Accept-Language:en-US,en;q=0.9',
+          '--add-header', 'Accept-Encoding:gzip, deflate',
+          '--add-header', 'Accept:*/*',
+          '--add-header', 'Connection:keep-alive',
+          '--geo-bypass',
+          '--force-ipv4',
+          '--socket-timeout', '30',
+          '--extractor-retries', '10',
+          '--fragment-retries', '10',
+          '--retry-sleep', '3',
+        ];
+
+        if (candidate.path) {
+          infoOptions.push('--cookies', candidate.path);
+        }
+
+        const info = await ytDlp.execPromise([url, ...infoOptions]);
+        const parsed = JSON.parse(info);
+        return formatMediaInfo(parsed);
+      } catch (attemptError) {
+        const message = extractYtDlpErrorMessage(attemptError);
+        lastErrorMessage = message;
+        attemptErrors.push(`[${candidate.label}] ${message}`);
+
+        if (!isLastAttempt && shouldRetryWithNextCookies(message)) {
+          console.warn(`✗ Info attempt with ${candidate.label} failed: ${message}`);
+          continue;
+        }
+
+        if (isLastAttempt) {
+          continue;
+        }
+
+        throw new Error(`Failed to get media info: ${message}`);
+      }
+    }
+
+    const attemptedLabels = cookieCandidates.map((candidate) => candidate.label).join(', ');
+    const attemptSummary = attemptErrors.length > 0 ? attemptErrors.join(' | ') : 'None';
+    const finalMessage = lastErrorMessage || 'Unknown yt-dlp error';
+
+    throw new Error(
+      `Failed to get media info after trying ${cookieCandidates.length} cookie option(s). yt-dlp last reported: ${finalMessage}. Attempt summary: ${attemptSummary}. Tried cookie sources: ${attemptedLabels}`
+    );
   } catch (error) {
     throw new Error(`Failed to get media info: ${(error as Error).message}`);
+  } finally {
+    if (cookieCandidates.length > 0) {
+      cleanupCookieCandidates(cookieCandidates);
+    }
   }
 };
 
