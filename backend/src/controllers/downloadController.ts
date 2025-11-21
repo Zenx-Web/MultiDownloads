@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { DownloadRequest, ApiResponse } from '../types';
 import { createJob, getJob, updateJob } from '../services/jobService';
 import { detectPlatform, isValidUrl } from '../services/urlService';
@@ -14,13 +14,14 @@ import * as path from 'path';
  */
 export const getVideoInfo = async (
   req: Request,
-  res: Response
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const { url, cookies } = req.body;
 
     if (!url || !isValidUrl(url)) {
-      throw new ApiError(400, 'Valid URL is required');
+      return next(new ApiError(400, 'Valid URL is required'));
     }
 
     const platform = detectPlatform(url);
@@ -32,7 +33,7 @@ export const getVideoInfo = async (
     });
   } catch (error) {
     if (error instanceof ApiError) {
-      throw error;
+      return next(error);
     }
     
     const errorMessage = (error as Error).message;
@@ -51,7 +52,7 @@ export const getVideoInfo = async (
       return;
     }
     
-    throw new ApiError(500, `Failed to fetch video info: ${errorMessage}`);
+    return next(new ApiError(500, `Failed to fetch video info: ${errorMessage}`));
   }
 };
 
@@ -61,14 +62,15 @@ export const getVideoInfo = async (
  */
 export const initiateDownload = async (
   req: Request<{}, {}, DownloadRequest>,
-  res: Response<ApiResponse>
+  res: Response<ApiResponse>,
+  next: NextFunction
 ) => {
   try {
     const { url, platform: requestedPlatform, quality = '720', format = 'mp4', cookies } = req.body;
 
     // Validate URL
     if (!url || !isValidUrl(url)) {
-      throw new ApiError(400, 'Invalid URL provided');
+      return next(new ApiError(400, 'Invalid URL provided'));
     }
 
     // Get user limits from middleware
@@ -76,10 +78,10 @@ export const initiateDownload = async (
 
     // Validate quality against user's tier limits
     if (!validateQualityLimit(quality, userLimits.maxResolution)) {
-      throw new ApiError(
+      return next(new ApiError(
         403,
         `Quality ${quality}p exceeds your tier limit of ${userLimits.maxResolution}p. Upgrade to premium for higher quality downloads.`
-      );
+      ));
     }
 
     // Detect platform
@@ -112,9 +114,9 @@ export const initiateDownload = async (
     });
   } catch (error) {
     if (error instanceof ApiError) {
-      throw error;
+      return next(error);
     }
-    throw new ApiError(500, `Download initiation failed: ${(error as Error).message}`);
+    return next(new ApiError(500, `Download initiation failed: ${(error as Error).message}`));
   }
 };
 
@@ -159,7 +161,8 @@ const processDownload = async (
  */
 export const getJobStatus = async (
   req: Request<{ jobId: string }>,
-  res: Response<ApiResponse>
+  res: Response<ApiResponse>,
+  next: NextFunction
 ) => {
   try {
     const { jobId } = req.params;
@@ -167,7 +170,7 @@ export const getJobStatus = async (
     const job = getJob(jobId);
 
     if (!job) {
-      throw new ApiError(404, 'Job not found');
+      return next(new ApiError(404, 'Job not found'));
     }
 
     res.json({
@@ -176,9 +179,9 @@ export const getJobStatus = async (
     });
   } catch (error) {
     if (error instanceof ApiError) {
-      throw error;
+      return next(error);
     }
-    throw new ApiError(500, 'Failed to fetch job status');
+    return next(new ApiError(500, 'Failed to fetch job status'));
   }
 };
 
@@ -188,7 +191,8 @@ export const getJobStatus = async (
  */
 export const downloadFile = async (
   req: Request<{ jobId: string }>,
-  res: Response
+  res: Response,
+  next: NextFunction
 ) => {
   try {
     const { jobId } = req.params;
@@ -196,20 +200,20 @@ export const downloadFile = async (
     const job = getJob(jobId);
 
     if (!job) {
-      throw new ApiError(404, 'Job not found');
+      return next(new ApiError(404, 'Job not found'));
     }
 
     if (job.status !== 'completed') {
-      throw new ApiError(400, 'Job is not completed yet');
+      return next(new ApiError(400, 'Job is not completed yet'));
     }
 
     if (!job.filePath) {
-      throw new ApiError(500, 'File path not found in job');
+      return next(new ApiError(500, 'File path not found in job'));
     }
 
     // Check if file exists
     if (!fs.existsSync(job.filePath)) {
-      throw new ApiError(404, 'File not found on server');
+      return next(new ApiError(404, 'File not found on server'));
     }
 
     // Get file info
@@ -249,8 +253,8 @@ export const downloadFile = async (
 
   } catch (error) {
     if (error instanceof ApiError) {
-      throw error;
+      return next(error);
     }
-    throw new ApiError(500, 'File download failed');
+    return next(new ApiError(500, 'File download failed'));
   }
 };
