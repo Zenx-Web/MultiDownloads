@@ -5,7 +5,6 @@ import { Platform } from '../types';
 import { config } from '../config';
 import { updateJob } from './jobService';
 import { sanitizeFilename } from './urlService';
-import { proxyRotator } from './proxyService';
 
 // Initialize yt-dlp wrapper
 let ytDlpWrap: YTDlpWrap;
@@ -138,67 +137,22 @@ export const downloadYouTubeVideo = async (
       '--dump-json',
       '--no-check-certificate',
       '--no-warnings',
-      '--extractor-args', 'youtube:player_client=ios,web',
-      '--extractor-args', 'youtube:skip=translated_subs',
+      '--extractor-args', 'youtube:player_client=ios,web,mweb',
+      '--extractor-args', 'youtube:skip=translated_subs,dash,hls',
       '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
       '--geo-bypass',
       '--force-ipv4',
+      '--socket-timeout', '30',
+      '--extractor-retries', '10',
+      '--fragment-retries', '10',
     ];
-    
-    // Add proxy with fallback
-    const proxyUrl = process.env.PROXY_URL || proxyRotator.getCurrentProxy();
-    if (proxyUrl) {
-      infoOptions.push('--proxy', proxyUrl);
-      console.log('✓ Using proxy for download:', proxyUrl.split('@').pop() || proxyUrl);
-    } else {
-      console.log('⚠ No proxy available, using direct connection');
-    }
     
     if (hasCookies) {
       infoOptions.push('--cookies', cookiesPath);
     }
     
-    let infoJson: string;
-    let info: any;
-    let workingProxyUrl: string | null = null;
-    let maxProxyRetries = 5;
-    
-    // Try with proxies, cycling through them on failure
-    for (let attempt = 0; attempt < maxProxyRetries; attempt++) {
-      const currentProxy = process.env.PROXY_URL || proxyRotator.getCurrentProxy();
-      
-      if (currentProxy && attempt < maxProxyRetries - 1) {
-        // Try with proxy
-        const proxyOptions = [...infoOptions, '--proxy', currentProxy];
-        console.log(`✓ Attempt ${attempt + 1}: Using proxy ${currentProxy.split('@').pop() || currentProxy}`);
-        
-        try {
-          infoJson = await ytDlp.execPromise([url, ...proxyOptions]);
-          info = JSON.parse(infoJson);
-          workingProxyUrl = currentProxy;
-          console.log('✅ Proxy succeeded!');
-          break;
-        } catch (error) {
-          console.warn(`❌ Proxy ${attempt + 1} failed, trying next...`);
-          proxyRotator.markCurrentProxyAsFailed();
-          continue;
-        }
-      } else {
-        // Last attempt or no proxies - try without proxy
-        console.log('⚠ Trying without proxy as final attempt...');
-        try {
-          infoJson = await ytDlp.execPromise([url, ...infoOptions]);
-          info = JSON.parse(infoJson);
-          workingProxyUrl = null;
-          console.log('✅ Direct connection succeeded!');
-          break;
-        } catch (error) {
-          if (attempt === maxProxyRetries - 1) {
-            throw error;
-          }
-        }
-      }
-    }
+    const infoJson = await ytDlp.execPromise([url, ...infoOptions]);
+    const info = JSON.parse(infoJson);
     
     const title = sanitizeFilename(info.title || 'video');
     const outputFilename = `${jobId}_${title}`;
@@ -212,27 +166,22 @@ export const downloadYouTubeVideo = async (
       '--newline',
       '--no-check-certificate',
       '--no-warnings',
-      '--extractor-args', 'youtube:player_client=ios,web,android',
-      '--extractor-args', 'youtube:skip=translated_subs',
+      '--extractor-args', 'youtube:player_client=ios,web,mweb,android',
+      '--extractor-args', 'youtube:skip=translated_subs,dash,hls',
       '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
       '--geo-bypass',
       '--force-ipv4',
-      '--sleep-requests', '1',
-      '--extractor-retries', '5',
+      '--sleep-requests', '0.5',
+      '--extractor-retries', '10',
+      '--fragment-retries', '10',
+      '--socket-timeout', '30',
+      '--throttled-rate', '100K',
       '-o', path.join(config.storage.tempDir, `${outputFilename}.%(ext)s`),
     ];
 
     // Add cookies if available
     if (hasCookies) {
       downloadOptions.push('--cookies', cookiesPath);
-    }
-    
-    // Use the same proxy that worked for info fetch
-    if (workingProxyUrl) {
-      downloadOptions.push('--proxy', workingProxyUrl);
-      console.log(`✓ Using working proxy for download: ${workingProxyUrl.split('@').pop() || workingProxyUrl}`);
-    } else {
-      console.log('⚠ Downloading without proxy');
     }
 
     if (format === 'mp3') {
@@ -571,11 +520,14 @@ export const getMediaInfo = async (
       }
       
       infoOptions.push(
-        '--extractor-args', 'youtube:player_client=ios,web',
-        '--extractor-args', 'youtube:skip=translated_subs',
+        '--extractor-args', 'youtube:player_client=ios,web,mweb',
+        '--extractor-args', 'youtube:skip=translated_subs,dash,hls',
         '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
         '--geo-bypass',
-        '--force-ipv4'
+        '--force-ipv4',
+        '--socket-timeout', '30',
+        '--extractor-retries', '10',
+        '--fragment-retries', '10'
       );
       
       // Add cookies if available
@@ -589,46 +541,8 @@ export const getMediaInfo = async (
       );
     }
     
-    let info: string;
-    let parsed: any;
-    let maxProxyRetries = 5;
-    
-    // Try with multiple proxies, cycling through them on failure
-    for (let attempt = 0; attempt < maxProxyRetries; attempt++) {
-      const currentProxy = isYouTube ? (process.env.PROXY_URL || proxyRotator.getCurrentProxy()) : null;
-      
-      if (currentProxy && attempt < maxProxyRetries - 1) {
-        // Try with proxy
-        const proxyOptions = [...infoOptions, '--proxy', currentProxy];
-        console.log(`✓ Attempt ${attempt + 1}: Using proxy ${currentProxy.split('@').pop() || currentProxy}`);
-        
-        try {
-          info = await ytDlp.execPromise([url, ...proxyOptions]);
-          parsed = JSON.parse(info);
-          console.log('✅ Proxy succeeded for info fetch!');
-          break;
-        } catch (error) {
-          console.warn(`❌ Proxy ${attempt + 1} failed, trying next...`);
-          if (isYouTube) {
-            proxyRotator.markCurrentProxyAsFailed();
-          }
-          continue;
-        }
-      } else {
-        // Last attempt or no proxies - try without proxy
-        console.log('⚠ Trying info fetch without proxy as final attempt...');
-        try {
-          info = await ytDlp.execPromise([url, ...infoOptions]);
-          parsed = JSON.parse(info);
-          console.log('✅ Direct connection succeeded for info!');
-          break;
-        } catch (error) {
-          if (attempt === maxProxyRetries - 1) {
-            throw error;
-          }
-        }
-      }
-    }
+    const info = await ytDlp.execPromise([url, ...infoOptions]);
+    const parsed = JSON.parse(info);
     
     // Extract relevant information
     return {
