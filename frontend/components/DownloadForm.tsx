@@ -41,16 +41,8 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
     downloadUrl: null,
   });
 
-  // Load cookies from localStorage on mount
-  useEffect(() => {
-    const savedCookies = localStorage.getItem('youtubeCookies');
-    if (savedCookies) {
-      setCookies(savedCookies);
-    }
-  }, []);
-
-  const handleCookieAccept = (extractedCookies: string) => {
-    setCookies(extractedCookies);
+  const handleCookieAccept = () => {
+    // Cookie consent accepted - no actual cookies extracted
   };
 
   // Poll job status when processing

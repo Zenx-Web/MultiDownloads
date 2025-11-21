@@ -3,12 +3,11 @@
 import { useState, useEffect } from 'react';
 
 interface CookieConsentProps {
-  onAccept: (cookies: string) => void;
+  onAccept: () => void;
 }
 
 export default function CookieConsent({ onAccept }: CookieConsentProps) {
   const [showConsent, setShowConsent] = useState(false);
-  const [isExtracting, setIsExtracting] = useState(false);
 
   useEffect(() => {
     const consent = localStorage.getItem('cookieConsent');
@@ -17,45 +16,13 @@ export default function CookieConsent({ onAccept }: CookieConsentProps) {
     }
   }, []);
 
-  const extractCookies = () => {
-    try {
-      // Get all cookies from the current domain
-      const cookies = document.cookie;
-      
-      // Convert to Netscape format
-      const netscapeCookies = cookies.split(';').map(cookie => {
-        const [name, value] = cookie.trim().split('=');
-        const domain = '.youtube.com';
-        const path = '/';
-        const secure = 'TRUE';
-        const expiry = Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60); // 1 year
-        return `${domain}\tTRUE\t${path}\t${secure}\t${expiry}\t${name}\t${value}`;
-      }).join('\n');
-
-      return netscapeCookies;
-    } catch (error) {
-      console.error('Failed to extract cookies:', error);
-      return '';
-    }
-  };
-
   const handleAccept = () => {
-    setIsExtracting(true);
-    
-    // Extract cookies
-    const cookies = extractCookies();
-    
     // Store consent
     localStorage.setItem('cookieConsent', 'accepted');
-    localStorage.setItem('youtubeCookies', cookies);
     
-    // Pass cookies to parent
-    onAccept(cookies);
-    
-    setTimeout(() => {
-      setShowConsent(false);
-      setIsExtracting(false);
-    }, 500);
+    // Pass to parent
+    onAccept();
+    setShowConsent(false);
   };
 
   const handleDecline = () => {
@@ -72,21 +39,19 @@ export default function CookieConsent({ onAccept }: CookieConsentProps) {
           <div className="text-3xl mr-3">🍪</div>
           <div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">
-              YouTube Download Permission
+              Cookie Consent Required
             </h3>
             <p className="text-sm text-gray-600 mb-3">
-              To download YouTube videos, we need to use your browser's YouTube cookies. 
-              This helps bypass YouTube's bot detection.
+              We use cookies to enhance your experience and enable site functionality.
             </p>
             <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
-              <p className="text-xs text-gray-700">
-                <strong>What happens:</strong>
+              <p className="text-xs text-gray-700 mb-2">
+                <strong>What we use cookies for:</strong>
               </p>
-              <ul className="text-xs text-gray-600 mt-1 space-y-1 ml-4 list-disc">
-                <li>We'll read your YouTube cookies from this browser session</li>
-                <li>Cookies are sent securely with your download requests</li>
-                <li>Cookies are NOT stored on our servers</li>
-                <li>Only used temporarily for your downloads</li>
+              <ul className="text-xs text-gray-600 space-y-1 ml-4 list-disc">
+                <li>Remember your preferences</li>
+                <li>Track download progress</li>
+                <li>Enable essential site functionality</li>
               </ul>
             </div>
           </div>
@@ -96,38 +61,14 @@ export default function CookieConsent({ onAccept }: CookieConsentProps) {
           <button
             onClick={handleDecline}
             className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-            disabled={isExtracting}
           >
             Decline
           </button>
           <button
             onClick={handleAccept}
-            disabled={isExtracting}
-            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-blue-400"
+            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
           >
-            {isExtracting ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Extracting...
-              </span>
-            ) : (
-              'Accept & Continue'
-            )}
+            Accept & Continue
           </button>
         </div>
 
