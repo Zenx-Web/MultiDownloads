@@ -111,6 +111,20 @@ const COOKIE_RETRY_PATTERNS = [
   'temporarily blocked',
 ];
 
+const sanitizeYouTubeUrl = (inputUrl: string): string => {
+  try {
+    const urlObj = new URL(inputUrl);
+    if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+      urlObj.searchParams.delete('si');
+      return urlObj.toString();
+    }
+  } catch {
+    // If parsing fails, fall through to manual cleanup
+  }
+
+  return inputUrl.replace(/\?si=[^&]+(&|$)/, (_match, trailing) => (trailing === '&' ? '?' : '')).replace(/&&+/g, '&');
+};
+
 const normalizeCookiePath = (filePath: string): string => {
   const trimmed = filePath.trim();
   if (!trimmed) {
@@ -325,13 +339,14 @@ export const downloadYouTubeVideo = async (
   jobId: string,
   userCookies?: string
 ): Promise<string> => {
+  const sanitizedUrl = sanitizeYouTubeUrl(url);
   const cookieCandidates = buildCookieCandidates(jobId, userCookies);
 
   try {
     updateJob(jobId, { progress: 5, status: 'processing', message: 'Validating YouTube URL...' });
 
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|music\.youtube\.com)\/.+$/;
-    if (!youtubeRegex.test(url)) {
+    if (!youtubeRegex.test(sanitizedUrl)) {
       throw new Error('Invalid YouTube URL');
     }
 
@@ -359,6 +374,7 @@ export const downloadYouTubeVideo = async (
         updateJob(jobId, { progress: 15, message: `Fetching video information (${attemptLabel})...` });
 
         const infoOptions: string[] = [
+          '--ignore-config',
           '--dump-json',
           '--no-check-certificate',
           '--no-warnings',
@@ -382,7 +398,7 @@ export const downloadYouTubeVideo = async (
           infoOptions.push('--cookies', candidate.path);
         }
 
-        const infoJson = await ytDlp.execPromise([url, ...infoOptions]);
+        const infoJson = await ytDlp.execPromise([sanitizedUrl, ...infoOptions]);
         const info = JSON.parse(infoJson);
 
         const title = sanitizeFilename(info.title || 'video');
@@ -395,6 +411,7 @@ export const downloadYouTubeVideo = async (
         });
 
         const downloadOptions: string[] = [
+          '--ignore-config',
           '--progress',
           '--newline',
           '--no-check-certificate',
@@ -442,7 +459,7 @@ export const downloadYouTubeVideo = async (
           downloadOptions.push('-f', `${formatSelector}/best`, '--merge-output-format', 'mp4');
         }
 
-        const ytDlpProcess = ytDlp.exec([url, ...downloadOptions]);
+        const ytDlpProcess = ytDlp.exec([sanitizedUrl, ...downloadOptions]);
 
         let lastProgress = 20;
 
@@ -788,6 +805,7 @@ export const getMediaInfo = async (
   const ytDlp = await ensureYtDlp();
 
   const isYouTube = url.includes('youtube.com') || url.includes('youtu.be') || url.includes('music.youtube.com');
+  const sanitizedUrl = sanitizeYouTubeUrl(url);
   const cookieCandidates = isYouTube ? buildCookieCandidates(`info_${Date.now()}`, userCookies) : [];
 
   const formatMediaInfo = (parsed: any) => ({
@@ -808,6 +826,7 @@ export const getMediaInfo = async (
 
   try {
     const baseInfoOptions = [
+      '--ignore-config',
       '--dump-json',
       '--no-check-certificate',
       '--no-warnings',
@@ -820,7 +839,7 @@ export const getMediaInfo = async (
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       ];
 
-      const info = await ytDlp.execPromise([url, ...infoOptions]);
+      const info = await ytDlp.execPromise([sanitizedUrl, ...infoOptions]);
       const parsed = JSON.parse(info);
       return formatMediaInfo(parsed);
     }
@@ -834,6 +853,7 @@ export const getMediaInfo = async (
 
       try {
         const infoOptions = [
+          '--ignore-config',
           ...baseInfoOptions,
           '--extractor-args', 'youtube:player_client=android,ios,web,mweb,tv_embedded',
           '--extractor-args', 'youtube:skip=translated_subs',
@@ -855,7 +875,7 @@ export const getMediaInfo = async (
           infoOptions.push('--cookies', candidate.path);
         }
 
-        const info = await ytDlp.execPromise([url, ...infoOptions]);
+        const info = await ytDlp.execPromise([sanitizedUrl, ...infoOptions]);
         const parsed = JSON.parse(info);
         return formatMediaInfo(parsed);
       } catch (attemptError) {
