@@ -42,8 +42,29 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
     downloadUrl: null,
   });
 
+  // Load saved cookies on mount
+  useEffect(() => {
+    const savedCookies = localStorage.getItem('userCookies');
+    if (savedCookies) {
+      setCookies(savedCookies);
+    }
+  }, []);
+
   const handleCookieAccept = () => {
     // Cookie consent accepted - no actual cookies extracted
+  };
+
+  const handleSaveCookies = () => {
+    if (cookies.trim()) {
+      localStorage.setItem('userCookies', cookies);
+      alert('✅ Cookies saved! They will be used automatically for future downloads.');
+    }
+  };
+
+  const handleClearCookies = () => {
+    localStorage.removeItem('userCookies');
+    setCookies('');
+    alert('🗑️ Cookies cleared!');
   };
 
   // Poll job status when processing
@@ -233,7 +254,7 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
             <div className="flex items-start gap-2 mb-3">
               <span className="text-2xl">🍪</span>
-              <div>
+              <div className="flex-1">
                 <h4 className="font-semibold text-amber-900 mb-1">Authentication Required</h4>
                 <p className="text-sm text-amber-700 mb-2">
                   This content requires authentication cookies. Paste your cookies below to continue.
@@ -246,7 +267,31 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
               placeholder="Paste your cookies here (Netscape format)&#10;&#10;Example:&#10;.youtube.com	TRUE	/	TRUE	1234567890	VISITOR_INFO1_LIVE	abcd1234..."
               className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent font-mono text-xs h-24 resize-vertical"
             />
-            <details className="mt-2">
+            <div className="flex gap-2 mt-3">
+              <button
+                type="button"
+                onClick={handleSaveCookies}
+                disabled={!cookies.trim()}
+                className="px-3 py-1.5 bg-amber-600 text-white text-xs rounded hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                💾 Save Cookies
+              </button>
+              <button
+                type="button"
+                onClick={handleClearCookies}
+                className="px-3 py-1.5 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
+              >
+                🗑️ Clear Saved
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCookiesInput(false)}
+                className="ml-auto px-3 py-1.5 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+              >
+                Hide
+              </button>
+            </div>
+            <details className="mt-3">
               <summary className="text-xs text-amber-700 cursor-pointer hover:text-amber-900">
                 📖 How to get cookies?
               </summary>
@@ -257,6 +302,25 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
                 <li>Copy and paste the cookies above</li>
               </ol>
             </details>
+          </div>
+        )}
+
+        {/* Show cookies status if saved */}
+        {cookies && !showCookiesInput && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">✅</span>
+              <span className="text-sm text-green-700 font-medium">
+                Using saved cookies for authentication
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCookiesInput(true)}
+              className="text-xs text-green-600 hover:text-green-800 underline"
+            >
+              Manage
+            </button>
           </div>
         )}
 

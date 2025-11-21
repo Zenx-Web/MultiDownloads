@@ -137,14 +137,24 @@ export const downloadYouTubeVideo = async (
       '--dump-json',
       '--no-check-certificate',
       '--no-warnings',
-      '--extractor-args', 'youtube:player_client=ios,web,mweb',
-      '--extractor-args', 'youtube:skip=translated_subs,dash,hls',
-      '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+      // Use Android client as primary (most reliable for bot detection)
+      '--extractor-args', 'youtube:player_client=android,ios,web,mweb,tv_embedded',
+      '--extractor-args', 'youtube:skip=translated_subs',
+      // Android app user-agent
+      '--user-agent', 'com.google.android.youtube/19.09.37 (Linux; U; Android 13; en_US) gzip',
+      // Additional headers to mimic real app
+      '--add-header', 'Accept-Language:en-US,en;q=0.9',
+      '--add-header', 'Accept-Encoding:gzip, deflate',
+      '--add-header', 'Accept:*/*',
+      '--add-header', 'Connection:keep-alive',
       '--geo-bypass',
       '--force-ipv4',
       '--socket-timeout', '30',
       '--extractor-retries', '10',
       '--fragment-retries', '10',
+      '--retry-sleep', '3',
+      // Enable embed workaround for restricted videos
+      '--extractor-args', 'youtube:player_skip=webpage,configs',
     ];
     
     if (hasCookies) {
@@ -166,16 +176,29 @@ export const downloadYouTubeVideo = async (
       '--newline',
       '--no-check-certificate',
       '--no-warnings',
-      '--extractor-args', 'youtube:player_client=ios,web,mweb,android',
-      '--extractor-args', 'youtube:skip=translated_subs,dash,hls',
-      '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+      // Android client first for best bot detection bypass
+      '--extractor-args', 'youtube:player_client=android,ios,web,mweb,tv_embedded',
+      '--extractor-args', 'youtube:skip=translated_subs',
+      '--extractor-args', 'youtube:player_skip=webpage,configs',
+      // Android app user-agent
+      '--user-agent', 'com.google.android.youtube/19.09.37 (Linux; U; Android 13; en_US) gzip',
+      // Browser-like headers
+      '--add-header', 'Accept-Language:en-US,en;q=0.9',
+      '--add-header', 'Accept-Encoding:gzip, deflate',
+      '--add-header', 'Accept:*/*',
+      '--add-header', 'Connection:keep-alive',
+      '--add-header', 'Sec-Fetch-Mode:navigate',
       '--geo-bypass',
       '--force-ipv4',
-      '--sleep-requests', '0.5',
-      '--extractor-retries', '10',
-      '--fragment-retries', '10',
+      '--sleep-requests', '1',
+      '--max-sleep-interval', '5',
+      '--extractor-retries', '15',
+      '--fragment-retries', '15',
+      '--retry-sleep', '5',
       '--socket-timeout', '30',
       '--throttled-rate', '100K',
+      // Age gate bypass
+      '--age-limit', '0',
       '-o', path.join(config.storage.tempDir, `${outputFilename}.%(ext)s`),
     ];
 
@@ -543,14 +566,21 @@ export const getMediaInfo = async (
       }
       
       infoOptions.push(
-        '--extractor-args', 'youtube:player_client=ios,web,mweb',
-        '--extractor-args', 'youtube:skip=translated_subs,dash,hls',
-        '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+        // Android client first for best bot detection bypass
+        '--extractor-args', 'youtube:player_client=android,ios,web,mweb,tv_embedded',
+        '--extractor-args', 'youtube:skip=translated_subs',
+        '--extractor-args', 'youtube:player_skip=webpage,configs',
+        '--user-agent', 'com.google.android.youtube/19.09.37 (Linux; U; Android 13; en_US) gzip',
+        '--add-header', 'Accept-Language:en-US,en;q=0.9',
+        '--add-header', 'Accept-Encoding:gzip, deflate',
+        '--add-header', 'Accept:*/*',
+        '--add-header', 'Connection:keep-alive',
         '--geo-bypass',
         '--force-ipv4',
         '--socket-timeout', '30',
         '--extractor-retries', '10',
-        '--fragment-retries', '10'
+        '--fragment-retries', '10',
+        '--retry-sleep', '3'
       );
       
       // Add cookies if available
