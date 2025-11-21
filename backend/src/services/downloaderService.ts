@@ -90,7 +90,8 @@ export const downloadYouTubeVideo = async (
   url: string,
   quality: string,
   format: string,
-  jobId: string
+  jobId: string,
+  userCookies?: string
 ): Promise<string> => {
   try {
     updateJob(jobId, { progress: 5, status: 'processing', message: 'Validating YouTube URL...' });
@@ -112,7 +113,22 @@ export const downloadYouTubeVideo = async (
     }
 
     // Setup cookies for YouTube
-    const { hasCookies, cookiesPath } = ensureCookies();
+    let cookiesPath: string | undefined;
+    let hasCookies = false;
+    
+    if (userCookies) {
+      // Use user-provided cookies
+      const tempCookiePath = path.join(config.storage.tempDir, `user_cookies_${jobId}.txt`);
+      fs.writeFileSync(tempCookiePath, userCookies);
+      cookiesPath = tempCookiePath;
+      hasCookies = true;
+      console.log('✓ Using user-provided cookies for download');
+    } else {
+      // Fall back to environment cookies
+      const envCookies = ensureCookies();
+      cookiesPath = envCookies.cookiesPath;
+      hasCookies = envCookies.hasCookies;
+    }
 
     // Get video info with bypass options
     updateJob(jobId, { progress: 15, message: 'Fetching video information...' });
@@ -464,7 +480,8 @@ export const downloadFacebookVideo = async (
  */
 export const getMediaInfo = async (
   url: string,
-  _platform: Platform
+  _platform: Platform,
+  userCookies?: string
 ): Promise<any> => {
   const ytDlp = await ensureYtDlp();
   
@@ -480,7 +497,21 @@ export const getMediaInfo = async (
 
     // Add platform-specific options
     if (isYouTube) {
-      const { hasCookies, cookiesPath } = ensureCookies();
+      // Check for user-provided cookies first, then fall back to environment cookies
+      let cookiesPath: string | undefined;
+      
+      if (userCookies) {
+        // Save user cookies to temporary file
+        const tempCookiePath = path.join(config.storage.tempDir, `user_cookies_${Date.now()}.txt`);
+        fs.writeFileSync(tempCookiePath, userCookies);
+        cookiesPath = tempCookiePath;
+        console.log('✓ Using user-provided cookies');
+      } else {
+        const { hasCookies, cookiesPath: envCookiesPath } = ensureCookies();
+        if (hasCookies) {
+          cookiesPath = envCookiesPath;
+        }
+      }
       
       infoOptions.push(
         '--extractor-args', 'youtube:player_client=ios,web',
@@ -490,8 +521,8 @@ export const getMediaInfo = async (
         '--force-ipv4'
       );
       
-      // Add cookies if available for YouTube
-      if (hasCookies) {
+      // Add cookies if available
+      if (cookiesPath) {
         infoOptions.push('--cookies', cookiesPath);
       }
     } else {
@@ -533,11 +564,12 @@ export const downloadMedia = async (
   platform: Platform,
   quality: string,
   format: string,
-  jobId: string
+  jobId: string,
+  userCookies?: string
 ): Promise<string> => {
   switch (platform) {
     case Platform.YOUTUBE:
-      return downloadYouTubeVideo(url, quality, format, jobId);
+      return downloadYouTubeVideo(url, quality, format, jobId, userCookies);
     
     case Platform.INSTAGRAM:
       return downloadInstagramVideo(url, jobId);

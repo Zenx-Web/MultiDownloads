@@ -17,14 +17,14 @@ export const getVideoInfo = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { url } = req.body;
+    const { url, cookies } = req.body;
 
     if (!url || !isValidUrl(url)) {
       throw new ApiError(400, 'Valid URL is required');
     }
 
     const platform = detectPlatform(url);
-    const info = await getMediaInfo(url, platform);
+    const info = await getMediaInfo(url, platform, cookies);
 
     res.json({
       success: true,
@@ -60,7 +60,7 @@ export const initiateDownload = async (
   res: Response<ApiResponse>
 ) => {
   try {
-    const { url, platform: requestedPlatform, quality = '720', format = 'mp4' } = req.body;
+    const { url, platform: requestedPlatform, quality = '720', format = 'mp4', cookies } = req.body;
 
     // Validate URL
     if (!url || !isValidUrl(url)) {
@@ -90,7 +90,7 @@ export const initiateDownload = async (
     incrementDownloadCount(req);
 
     // Start download asynchronously
-    processDownload(job.id, url, platform, quality, format, req)
+    processDownload(job.id, url, platform, quality, format, req, cookies)
       .catch((error) => {
         updateJob(job.id, {
           status: 'failed',
@@ -123,12 +123,13 @@ const processDownload = async (
   platform: any,
   quality: string,
   format: string,
-  req: Request
+  req: Request,
+  cookies?: string
 ) => {
   try {
     updateJob(jobId, { status: 'processing', progress: 5 });
 
-    const filePath = await downloadMedia(url, platform, quality, format, jobId);
+    const filePath = await downloadMedia(url, platform, quality, format, jobId, cookies);
 
     updateJob(jobId, {
       status: 'completed',
