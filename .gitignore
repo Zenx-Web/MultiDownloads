@@ -82,6 +82,10 @@ Desktop.ini
 backend/yt-dlp
 backend/yt-dlp.exe
 
+# Cookies (sensitive data)
+backend/cookies.txt
+backend/user_cookies.txt
+
 # FFmpeg
 backend/ffmpeg/
 

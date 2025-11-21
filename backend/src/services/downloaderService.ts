@@ -59,28 +59,53 @@ const ensureYtDlp = async (): Promise<YTDlpWrap> => {
 };
 
 /**
+ * Save user-provided cookies to use as fallback for future requests
+ */
+const saveUserCookies = (cookies: string): void => {
+  try {
+    const userCookiesPath = path.join(__dirname, '../../user_cookies.txt');
+    const timestamp = new Date().toISOString();
+    const header = `# User-provided cookies (last updated: ${timestamp})\n`;
+    fs.writeFileSync(userCookiesPath, header + cookies);
+    console.log('✓ Saved user-provided cookies for future use');
+  } catch (error) {
+    console.warn('✗ Failed to save user cookies:', error);
+  }
+};
+
+/**
  * Ensure cookies are available for YouTube downloads
+ * Priority: 1) Environment cookies, 2) User-provided cookies (stored fallback), 3) None
  */
 const ensureCookies = (): { hasCookies: boolean; cookiesPath: string } => {
-  const cookiesPath = path.join(__dirname, '../../cookies.txt');
-  let hasCookies = fs.existsSync(cookiesPath);
+  const envCookiesPath = path.join(__dirname, '../../cookies.txt');
+  const userCookiesPath = path.join(__dirname, '../../user_cookies.txt');
   
-  // If no file, try to create from environment variable
-  if (!hasCookies && process.env.YOUTUBE_COOKIES) {
+  // Priority 1: Environment cookies (most trusted)
+  if (fs.existsSync(envCookiesPath)) {
+    console.log('✓ Using environment cookies.txt file');
+    return { hasCookies: true, cookiesPath: envCookiesPath };
+  }
+  
+  // Priority 2: Try to create from environment variable
+  if (process.env.YOUTUBE_COOKIES) {
     try {
-      fs.writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES);
-      hasCookies = true;
+      fs.writeFileSync(envCookiesPath, process.env.YOUTUBE_COOKIES);
       console.log('✓ Created cookies.txt from YOUTUBE_COOKIES environment variable');
+      return { hasCookies: true, cookiesPath: envCookiesPath };
     } catch (error) {
       console.warn('✗ Failed to write cookies from env:', error);
     }
-  } else if (hasCookies) {
-    console.log('✓ Using existing cookies.txt file');
-  } else {
-    console.warn('⚠ No YouTube cookies available - may encounter bot detection');
   }
   
-  return { hasCookies, cookiesPath };
+  // Priority 3: Use stored user cookies as fallback
+  if (fs.existsSync(userCookiesPath)) {
+    console.log('✓ Using stored user-provided cookies as fallback');
+    return { hasCookies: true, cookiesPath: userCookiesPath };
+  }
+  
+  console.warn('⚠ No YouTube cookies available - may encounter bot detection');
+  return { hasCookies: false, cookiesPath: envCookiesPath };
 };
 
 /**
@@ -123,8 +148,11 @@ export const downloadYouTubeVideo = async (
       cookiesPath = tempCookiePath;
       hasCookies = true;
       console.log('✓ Using user-provided cookies for download');
+      
+      // Save successful user cookies for future use (stored after download succeeds)
+      // This will be done in the success handler
     } else {
-      // Fall back to environment cookies
+      // Fall back to environment cookies or stored user cookies
       const envCookies = ensureCookies();
       cookiesPath = envCookies.cookiesPath;
       hasCookies = envCookies.hasCookies;
@@ -262,6 +290,11 @@ export const downloadYouTubeVideo = async (
         if (code === 0) {
           updateJob(jobId, { progress: 95, message: 'Finalizing download...' });
           
+          // If download succeeded with user cookies, save them for future use
+          if (userCookies) {
+            saveUserCookies(userCookies);
+          }
+          
           // The file might have a different extension, find it
           const files = fs.readdirSync(config.storage.tempDir);
           const downloadedFile = files.find(f => f.startsWith(outputFilename));
@@ -384,6 +417,11 @@ export const downloadInstagramVideo = async (
       ytDlpProcess.on('close', (code) => {
         if (code === 0) {
           updateJob(jobId, { progress: 95, message: 'Finalizing...' });
+          
+          // If download succeeded with user cookies, save them for future use (Instagram)
+          if (userCookies) {
+            saveUserCookies(userCookies);
+          }
           
           // Find the downloaded file
           const files = fs.readdirSync(config.storage.tempDir);
