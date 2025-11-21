@@ -144,6 +144,12 @@ export const downloadYouTubeVideo = async (
       '--force-ipv4',
     ];
     
+    // Add proxy if configured
+    if (process.env.PROXY_URL) {
+      infoOptions.push('--proxy', process.env.PROXY_URL);
+      console.log('✓ Using proxy for download');
+    }
+    
     if (hasCookies) {
       infoOptions.push('--cookies', cookiesPath);
     }
@@ -176,6 +182,11 @@ export const downloadYouTubeVideo = async (
     // Add cookies if available
     if (hasCookies) {
       downloadOptions.push('--cookies', cookiesPath);
+    }
+    
+    // Add proxy if configured
+    if (process.env.PROXY_URL) {
+      downloadOptions.push('--proxy', process.env.PROXY_URL);
     }
 
     if (format === 'mp3') {
@@ -520,6 +531,11 @@ export const getMediaInfo = async (
         '--geo-bypass',
         '--force-ipv4'
       );
+      
+      // Add proxy if configured
+      if (process.env.PROXY_URL) {
+        infoOptions.push('--proxy', process.env.PROXY_URL);
+      }
       
       // Add cookies if available
       if (cookiesPath) {
