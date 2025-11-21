@@ -8,6 +8,7 @@ export interface DownloadRequest {
   quality?: string; // '360', '480', '720', '1080', '1440', '2160' (4K)
   format?: 'mp4' | 'webm' | 'mkv' | 'mp3' | 'wav';
   action?: 'download' | 'audio-only';
+  cookies?: string; // Optional user-provided cookies for bypassing restrictions
 }
 
 export interface ConvertVideoRequest {
