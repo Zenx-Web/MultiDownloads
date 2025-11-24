@@ -1,12 +1,13 @@
 'use client';
 
 /* eslint-disable react/no-unescaped-entities */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import CookieConsent from './CookieConsent';
 import { downloadFileFromApi } from '@/lib/fileDownload';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { getPlan } from '@/lib/plans';
+import { useAuth } from '@/contexts/AuthContext';
 
 const FREE_PLAN = getPlan('free');
 const FREE_PLAN_LIMIT_LABEL =
@@ -52,6 +53,19 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
   const [showCookiesInput, setShowCookiesInput] = useState(false);
   const [downloadState, setDownloadState] = useState<DownloadState>(() => createInitialDownloadState());
   const { refresh: refreshSubscription } = useSubscription();
+  const { session } = useAuth();
+  const authToken = session?.access_token || null;
+  const authHeaders = useMemo(() => {
+    if (!authToken) {
+      return undefined;
+    }
+
+    return {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    };
+  }, [authToken]);
 
   const refreshUsageSnapshot = useCallback(() => {
     refreshSubscription().catch((error) => {
@@ -94,7 +108,7 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
     if (downloadState.jobId && downloadState.status === 'processing') {
       const interval = setInterval(async () => {
         try {
-          const response = await axios.get(`${API_URL}/status/${downloadState.jobId}`);
+          const response = await axios.get(`${API_URL}/status/${downloadState.jobId}`, authHeaders);
           const job = response.data.data;
 
           setDownloadState(prev => ({ ...prev, progress: job.progress || 0 }));
@@ -122,7 +136,7 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
 
       return () => clearInterval(interval);
     }
-  }, [downloadState.jobId, downloadState.status]);
+  }, [downloadState.jobId, downloadState.status, authHeaders]);
 
   const handleDownloadClick = async () => {
     // First click: Fetch info and start download
@@ -143,10 +157,14 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
 
       try {
         // Fetch video info
-        const infoResponse = await axios.post(`${API_URL}/download/info`, { 
-          url,
-          ...(cookies && { cookies })
-        });
+        const infoResponse = await axios.post(
+          `${API_URL}/download/info`,
+          {
+            url,
+            ...(cookies && { cookies }),
+          },
+          authHeaders
+        );
         
         if (!infoResponse.data.success) {
           throw new Error(infoResponse.data.error || 'Failed to fetch video info');
@@ -162,14 +180,18 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
         }));
 
         // Start download process
-        const downloadResponse = await axios.post(`${API_URL}/download`, {
-          url,
-          quality: action === 'audio' ? '720p' : quality,
-          format: action === 'audio' ? 'mp3' : format,
-          action: action === 'audio' ? 'audio-only' : 'download',
-          platform: 'auto',
-          ...(cookies && { cookies })
-        });
+        const downloadResponse = await axios.post(
+          `${API_URL}/download`,
+          {
+            url,
+            quality: action === 'audio' ? '720p' : quality,
+            format: action === 'audio' ? 'mp3' : format,
+            action: action === 'audio' ? 'audio-only' : 'download',
+            platform: 'auto',
+            ...(cookies && { cookies }),
+          },
+          authHeaders
+        );
 
         if (!downloadResponse.data.success) {
           throw new Error(downloadResponse.data.error || 'Failed to start download');

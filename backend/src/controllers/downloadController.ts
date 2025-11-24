@@ -5,6 +5,7 @@ import { detectPlatform, isValidUrl } from '../services/urlService';
 import { downloadMedia, getMediaInfo } from '../services/downloaderService';
 import { ApiError } from '../middlewares/errorHandler';
 import { incrementDownloadCount, decrementConcurrentCount, validateQualityLimit } from '../middlewares/tierLimits';
+import { recordDownloadUsage } from '../services/usageService';
 import { JOB_FAILURE_MESSAGE, logAndExtractError } from '../utils/errorUtils';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -68,6 +69,8 @@ export const initiateDownload = async (
 ) => {
   try {
     const { url, platform: requestedPlatform, quality = '720', format = 'mp4', cookies } = req.body;
+    const authUser = (req as any).user as { id?: string } | undefined;
+    const userId = authUser?.id || null;
 
     // Validate URL
     if (!url || !isValidUrl(url)) {
@@ -97,7 +100,7 @@ export const initiateDownload = async (
     incrementDownloadCount(req);
 
     // Start download asynchronously
-    processDownload(job.id, url, platform, quality, format, req, cookies).catch((error) => {
+    processDownload(job.id, url, platform, quality, format, req, cookies, userId).catch((error) => {
       logAndExtractError('downloadController.processDownloadUncaught', error);
       updateJob(job.id, {
         status: 'failed',
@@ -132,7 +135,8 @@ const processDownload = async (
   quality: string,
   format: string,
   req: Request,
-  cookies?: string
+  cookies?: string,
+  userId?: string | null
 ) => {
   try {
     updateJob(jobId, { status: 'processing', progress: 5 });
@@ -146,6 +150,10 @@ const processDownload = async (
       downloadUrl: `/api/download/file/${jobId}`,
       message: 'Download completed successfully!',
     });
+
+    if (userId) {
+      await recordDownloadUsage(userId);
+    }
   } catch (error) {
     logAndExtractError('downloadController.processDownload', error);
     updateJob(jobId, {
