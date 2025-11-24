@@ -1,10 +1,16 @@
 'use client';
 
 /* eslint-disable react/no-unescaped-entities */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import CookieConsent from './CookieConsent';
 import { downloadFileFromApi } from '@/lib/fileDownload';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { getPlan } from '@/lib/plans';
+
+const FREE_PLAN = getPlan('free');
+const FREE_PLAN_LIMIT_LABEL =
+  FREE_PLAN.dailyLimit === null ? 'Unlimited downloads' : `${FREE_PLAN.dailyLimit} downloads/day`;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -45,6 +51,13 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
   const [cookies, setCookies] = useState('');
   const [showCookiesInput, setShowCookiesInput] = useState(false);
   const [downloadState, setDownloadState] = useState<DownloadState>(() => createInitialDownloadState());
+  const { refresh: refreshSubscription } = useSubscription();
+
+  const refreshUsageSnapshot = useCallback(() => {
+    refreshSubscription().catch((error) => {
+      console.warn('[subscription] unable to refresh usage snapshot', error);
+    });
+  }, [refreshSubscription]);
 
   const resetDownloadState = () => {
     setDownloadState(createInitialDownloadState());
@@ -172,6 +185,8 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
           onJobCreated(jobId);
         }
 
+        refreshUsageSnapshot();
+
       } catch (err: any) {
         const errorMsg = err.response?.data?.error || err.message || 'Failed to process request';
         const errorMessage = err.response?.data?.message || errorMsg;
@@ -218,6 +233,7 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
 
       try {
         await downloadFileFromApi(downloadState.downloadUrl, API_URL);
+        refreshUsageSnapshot();
         resetDownloadState();
       } catch (err) {
         console.error('Download trigger failed:', err);
@@ -511,7 +527,7 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
 
         {/* Info Text */}
         <p className="text-sm text-gray-500 text-center">
-          Free users: 5 downloads/day, up to 720p. 
+          Free users: {FREE_PLAN_LIMIT_LABEL}, up to 720p.
           <a href="/pricing" className="text-blue-600 hover:underline ml-1">
             Upgrade for unlimited access
           </a>

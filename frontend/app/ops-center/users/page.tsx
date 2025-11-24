@@ -5,10 +5,12 @@ import type { User } from '@supabase/supabase-js';
 import { getAdminContext } from '../admin-utils';
 import { createAdminServerClient } from '@/lib/supabase/admin';
 import StatusToast from '@/components/StatusToast';
+import { getAllPlans } from '@/lib/plans';
 
 export const dynamic = 'force-dynamic';
 
 const USERS_PATH = '/ops-center/users';
+const PLAN_OPTIONS = getAllPlans();
 
 const encodeParam = (value: string) => encodeURIComponent(value);
 const decodeParam = (value?: string) => (value ? decodeURIComponent(value) : undefined);
@@ -318,9 +320,11 @@ export default async function UsersPanelPage({ searchParams }: PageProps) {
                 className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 defaultValue="free"
               >
-                <option value="free">Free</option>
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
+                {PLAN_OPTIONS.map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.label}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="text-sm font-medium text-gray-700">

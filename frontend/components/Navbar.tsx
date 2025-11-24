@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useRef, useState } from 'react';
-import { getRemainingDownloads, getUserPlan } from '@/lib/plans';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
 const getDisplayName = (email?: string | null, metadata?: Record<string, any>) => {
   const candidate = metadata?.full_name || metadata?.name || metadata?.user_name || metadata?.preferred_username;
@@ -34,6 +34,7 @@ const getInitials = (name: string) => {
 
 export default function Navbar() {
   const { user, signOut } = useAuth();
+  const { plan, downloadsUsedToday, isLoading: subscriptionLoading } = useSubscription();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
@@ -42,16 +43,12 @@ export default function Navbar() {
     : null;
   const displayName = user ? getDisplayName(user.email, metadata || undefined) : '';
   const avatarUrl = user ? getAvatarUrl(metadata || undefined) : '';
-  const plan = getUserPlan(user || undefined);
-  // TODO: Replace downloads_today with the real usage counter coming from your API once available.
-  const downloadsUsedTodayRaw = Number(metadata?.downloads_today ?? metadata?.downloadsUsedToday ?? 0);
-  const downloadsUsedToday = Number.isFinite(downloadsUsedTodayRaw) ? Math.max(downloadsUsedTodayRaw, 0) : 0;
-  const remainingDownloads = getRemainingDownloads(plan, downloadsUsedToday);
-  const downloadsSummary =
-    plan.dailyLimit === null
+  const downloadsSummary = subscriptionLoading
+    ? 'Syncing usage...'
+    : plan.dailyLimit === null
       ? 'Unlimited downloads'
       : `${downloadsUsedToday}/${plan.dailyLimit} downloads today`;
-  const priceLabel = `₹${plan.priceMonthly}/month`;
+  const priceLabel = subscriptionLoading ? '₹—/month' : `₹${plan.priceMonthly}/month`;
 
   useEffect(() => {
     if (!profileMenuOpen) return;
@@ -161,7 +158,11 @@ export default function Navbar() {
                       {displayName}
                     </span>
                     <span className="text-xs text-gray-500 capitalize">
-                      {plan.label}
+                      {subscriptionLoading ? (
+                        <span className="inline-flex h-3 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true" />
+                      ) : (
+                        plan.label
+                      )}
                     </span>
                   </div>
                   <svg
@@ -197,15 +198,33 @@ export default function Navbar() {
                   <div className="px-4 py-4 text-sm text-gray-600 space-y-3">
                     <div className="flex items-center justify-between">
                       <span>Plan</span>
-                      <span className="font-semibold capitalize">{plan.label}</span>
+                      <span className="font-semibold capitalize">
+                        {subscriptionLoading ? (
+                          <span className="inline-flex h-3 w-20 animate-pulse rounded bg-gray-200" aria-hidden="true" />
+                        ) : (
+                          plan.label
+                        )}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span>Price</span>
-                      <span className="font-semibold">{priceLabel}</span>
+                      <span className="font-semibold">
+                        {subscriptionLoading ? (
+                          <span className="inline-flex h-3 w-24 animate-pulse rounded bg-gray-200" aria-hidden="true" />
+                        ) : (
+                          priceLabel
+                        )}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span>Status</span>
-                      <span className="font-semibold">{downloadsSummary}</span>
+                      <span className="font-semibold">
+                        {subscriptionLoading ? (
+                          <span className="inline-flex h-3 w-28 animate-pulse rounded bg-gray-200" aria-hidden="true" />
+                        ) : (
+                          downloadsSummary
+                        )}
+                      </span>
                     </div>
                   </div>
                   <div className="border-t border-gray-100">
@@ -288,15 +307,33 @@ export default function Navbar() {
                   <div className="mt-3 space-y-1 text-xs text-gray-600">
                     <div className="flex justify-between">
                       <span>Plan</span>
-                      <span className="font-semibold capitalize">{plan.label}</span>
+                      <span className="font-semibold capitalize">
+                        {subscriptionLoading ? (
+                          <span className="inline-flex h-3 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true" />
+                        ) : (
+                          plan.label
+                        )}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Price</span>
-                      <span className="font-semibold">{priceLabel}</span>
+                      <span className="font-semibold">
+                        {subscriptionLoading ? (
+                          <span className="inline-flex h-3 w-20 animate-pulse rounded bg-gray-200" aria-hidden="true" />
+                        ) : (
+                          priceLabel
+                        )}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Status</span>
-                      <span className="font-semibold">{downloadsSummary}</span>
+                      <span className="font-semibold">
+                        {subscriptionLoading ? (
+                          <span className="inline-flex h-3 w-28 animate-pulse rounded bg-gray-200" aria-hidden="true" />
+                        ) : (
+                          downloadsSummary
+                        )}
+                      </span>
                     </div>
                   </div>
                 </div>

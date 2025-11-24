@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { getAllPlans, getUserPlan, type PlanConfig } from '@/lib/plans';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { getAllPlans, type PlanConfig } from '@/lib/plans';
 
 const formatPrice = (plan: PlanConfig) => `₹${plan.priceMonthly}/month`;
 
@@ -10,9 +9,8 @@ const formatLimit = (plan: PlanConfig) =>
   plan.dailyLimit === null ? 'Unlimited downloads' : `${plan.dailyLimit} downloads/day`;
 
 export default function PricingPage() {
-  const { user } = useAuth();
+  const { plan: currentPlan, isLoading: subscriptionLoading } = useSubscription();
   const plans = getAllPlans();
-  const currentPlan = useMemo(() => getUserPlan(user || undefined), [user]);
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -26,6 +24,7 @@ export default function PricingPage() {
           {plans.map((plan) => {
             const isCurrent = plan.id === currentPlan.id;
             const highlight = plan.id === 'pro';
+            const buttonLabel = subscriptionLoading ? 'Syncing plan...' : isCurrent ? 'Current plan' : 'Choose plan';
 
             return (
               <div
@@ -77,8 +76,9 @@ export default function PricingPage() {
                         ? 'bg-white text-blue-600'
                         : 'bg-blue-600 text-white'
                   }`}
+                  disabled={subscriptionLoading && isCurrent}
                 >
-                  {isCurrent ? 'Current plan' : 'Choose plan'}
+                  {buttonLabel}
                 </button>
               </div>
             );
