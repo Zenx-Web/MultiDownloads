@@ -2,11 +2,63 @@
 
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+const getDisplayName = (email?: string | null, metadata?: Record<string, any>) => {
+  const candidate = metadata?.full_name || metadata?.name || metadata?.user_name || metadata?.preferred_username;
+  if (candidate) return candidate as string;
+  if (email) {
+    return email.split('@')[0];
+  }
+  return 'Account';
+};
+
+const getAvatarUrl = (metadata?: Record<string, any>) => {
+  return (
+    (metadata?.avatar_url as string | undefined) ||
+    (metadata?.picture as string | undefined) ||
+    (metadata?.image as string | undefined) ||
+    ''
+  );
+};
+
+const getInitials = (name: string) => {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+};
 
 export default function Navbar() {
   const { user, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const metadata = user
+    ? ({ ...(user.user_metadata || {}), ...(user.app_metadata || {}) } as Record<string, any>)
+    : null;
+  const displayName = user ? getDisplayName(user.email, metadata || undefined) : '';
+  const avatarUrl = user ? getAvatarUrl(metadata || undefined) : '';
+  const planValue = metadata?.subscription_tier ? String(metadata.subscription_tier) : 'free';
+  const planLabel = planValue.charAt(0).toUpperCase() + planValue.slice(1);
+  const dailyLimitValue = metadata?.daily_limit as string | number | undefined;
+  const dailyLimitLabel = dailyLimitValue !== undefined && dailyLimitValue !== null ? String(dailyLimitValue) : '—';
+  const downloadsTodayValue = metadata?.downloads_today as string | number | undefined;
+  const downloadsTodayLabel =
+    downloadsTodayValue !== undefined && downloadsTodayValue !== null ? String(downloadsTodayValue) : '—';
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [profileMenuOpen]);
 
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50">
@@ -88,17 +140,83 @@ export default function Navbar() {
           {/* Auth Buttons */}
           <div className="flex items-center space-x-4">
             {user ? (
-              <>
-                <span className="text-gray-700 text-sm hidden md:inline">
-                  {user.email}
-                </span>
+              <div className="relative" ref={profileMenuRef}>
                 <button
-                  onClick={() => signOut()}
-                  className="text-gray-700 hover:text-blue-600 transition-colors font-medium"
+                  className="flex items-center gap-3 rounded-full border border-gray-200 bg-white px-3 py-1.5 shadow-sm transition hover:border-blue-200"
+                  onClick={() => setProfileMenuOpen((prev) => !prev)}
                 >
-                  Sign Out
+                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white font-semibold">
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt={displayName} className="h-10 w-10 rounded-full object-cover" />
+                    ) : (
+                      getInitials(displayName) || 'U'
+                    )}
+                  </div>
+                  <div className="hidden md:flex flex-col items-start">
+                    <span className="text-sm font-semibold text-gray-900">
+                      {displayName}
+                    </span>
+                    <span className="text-xs text-gray-500 capitalize">
+                      {planLabel}
+                    </span>
+                  </div>
+                  <svg
+                    className="h-4 w-4 text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </button>
-              </>
+
+                <div
+                  className={`absolute right-0 mt-3 w-72 rounded-2xl border border-gray-100 bg-white shadow-2xl transition-all duration-200 ${
+                    profileMenuOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-semibold">
+                      {avatarUrl ? (
+                        <img src={avatarUrl} alt={displayName} className="h-12 w-12 rounded-full object-cover" />
+                      ) : (
+                        getInitials(displayName) || 'U'
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {displayName}
+                      </p>
+                      <p className="text-xs text-gray-500">{user.email}</p>
+                    </div>
+                  </div>
+                  <div className="px-4 py-4 text-sm text-gray-600 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span>Plan</span>
+                      <span className="font-semibold capitalize">{planLabel}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Daily limit</span>
+                      <span className="font-semibold">{dailyLimitLabel}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Downloads today</span>
+                      <span className="font-semibold">{downloadsTodayLabel}</span>
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-100">
+                    <button
+                      className="w-full px-4 py-3 text-left text-sm font-semibold text-red-600 hover:bg-red-50"
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        signOut();
+                      }}
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              </div>
             ) : (
               <>
                 <Link href="/login" className="text-gray-700 hover:text-blue-600 transition-colors font-medium">
@@ -156,6 +274,35 @@ export default function Navbar() {
             <Link href="/pricing" className="block py-2 text-gray-700 hover:text-blue-600 transition-colors">
               Pricing
             </Link>
+            {user ? (
+              <>
+                <div className="mt-4 rounded-xl border border-gray-200 p-4">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {displayName}
+                  </p>
+                  <p className="text-xs text-gray-500">{user.email}</p>
+                  <div className="mt-3 space-y-1 text-xs text-gray-600">
+                    <div className="flex justify-between">
+                      <span>Plan</span>
+                      <span className="font-semibold capitalize">{planLabel}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Daily limit</span>
+                      <span className="font-semibold">{dailyLimitLabel}</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  className="mt-3 w-full rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    signOut();
+                  }}
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : null}
           </div>
         )}
       </div>
