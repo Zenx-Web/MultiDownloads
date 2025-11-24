@@ -3,6 +3,7 @@ import * as path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import sharp from 'sharp';
 import puppeteer from 'puppeteer';
+// @ts-ignore - no types available
 import createGtts from 'node-gtts';
 import { updateJob } from './jobService';
 

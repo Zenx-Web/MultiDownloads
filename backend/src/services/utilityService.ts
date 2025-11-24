@@ -3,7 +3,9 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import QRCode from 'qrcode';
 import sharp from 'sharp';
+// @ts-ignore - no types available
 import colorThief from 'colorthief';
+// @ts-ignore - no types available
 import toIco from 'to-ico';
 import { updateJob } from './jobService';
 
