@@ -13,6 +13,62 @@ async function getCurrentUser() {
   return user;
 }
 
+type AdminStats = {
+  totalJobsTracked: number;
+  totalJobsCreated: number;
+  jobsPending: number;
+  jobsProcessing: number;
+  jobsCompleted: number;
+  jobsFailed: number;
+  jobsQueued: number;
+  activeJobs: number;
+  successRate: number;
+  uptimeSeconds: number;
+  startedAt: string;
+  lastUpdated: string;
+};
+
+const defaultStats: AdminStats = {
+  totalJobsTracked: 0,
+  totalJobsCreated: 0,
+  jobsPending: 0,
+  jobsProcessing: 0,
+  jobsCompleted: 0,
+  jobsFailed: 0,
+  jobsQueued: 0,
+  activeJobs: 0,
+  successRate: 100,
+  uptimeSeconds: 0,
+  startedAt: new Date().toISOString(),
+  lastUpdated: new Date().toISOString(),
+};
+
+const resolveAdminApiBase = () => {
+  const explicit = process.env.ADMIN_BACKEND_URL;
+  const fallback = process.env.NEXT_PUBLIC_API_URL;
+  const base = explicit || fallback || 'http://localhost:5000/api';
+  return base.replace(/\/$/, '');
+};
+
+async function fetchSystemStats(): Promise<AdminStats> {
+  try {
+    const baseUrl = resolveAdminApiBase();
+    const response = await fetch(`${baseUrl}/admin/stats`, {
+      cache: 'no-store',
+      next: { revalidate: 0 },
+    });
+
+    if (!response.ok) {
+      return defaultStats;
+    }
+
+    const payload = await response.json();
+    return { ...defaultStats, ...(payload?.data as Partial<AdminStats>) };
+  } catch (error) {
+    return defaultStats;
+  }
+}
+
 export default async function OpsCenterPage() {
   const user = await getCurrentUser();
   const metadataRoles: string[] = Array.isArray(user?.app_metadata?.roles)
@@ -22,6 +78,32 @@ export default async function OpsCenterPage() {
   if (!isAdminUser(user)) {
     redirect('/');
   }
+
+  const stats = await fetchSystemStats();
+
+  // Helper to format numeric metrics consistently
+  const formatNumber = (value: number) => value.toLocaleString('en-US');
+  const formatPercent = (value: number) => `${value.toFixed(1)}%`;
+  const formatDuration = (seconds: number) => {
+    if (seconds <= 0) return '0m';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
+  const formatTime = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'N/A';
+    }
+    return new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(date);
+  };
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -33,10 +115,14 @@ export default async function OpsCenterPage() {
               <h1 className="text-2xl font-bold text-gray-900">Operations Center</h1>
               <p className="text-sm text-gray-600">Administrative dashboard for system management</p>
             </div>
-            <div className="flex items-center space-x-3">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                System Online
-              </span>
+            <div className="text-right">
+              <div className="flex items-center justify-end space-x-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  System Online
+                </span>
+                <span className="text-xs text-gray-500">Uptime {formatDuration(stats.uptimeSeconds)}</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Last refresh {formatTime(stats.lastUpdated)}</p>
             </div>
           </div>
         </div>
@@ -56,8 +142,8 @@ export default async function OpsCenterPage() {
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Active Users</p>
-                <p className="text-2xl font-semibold text-gray-900">1,234</p>
+                <p className="text-sm font-medium text-gray-500">Active Jobs</p>
+                <p className="text-2xl font-semibold text-gray-900">{formatNumber(stats.activeJobs)}</p>
               </div>
             </div>
           </div>
@@ -73,7 +159,7 @@ export default async function OpsCenterPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Jobs Completed</p>
-                <p className="text-2xl font-semibold text-gray-900">5,678</p>
+                <p className="text-2xl font-semibold text-gray-900">{formatNumber(stats.jobsCompleted)}</p>
               </div>
             </div>
           </div>
@@ -89,7 +175,7 @@ export default async function OpsCenterPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Queue Size</p>
-                <p className="text-2xl font-semibold text-gray-900">23</p>
+                <p className="text-2xl font-semibold text-gray-900">{formatNumber(stats.jobsQueued)}</p>
               </div>
             </div>
           </div>
@@ -104,8 +190,8 @@ export default async function OpsCenterPage() {
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">System Health</p>
-                <p className="text-2xl font-semibold text-gray-900">98%</p>
+                <p className="text-sm font-medium text-gray-500">Success Rate</p>
+                <p className="text-2xl font-semibold text-gray-900">{formatPercent(stats.successRate)}</p>
               </div>
             </div>
           </div>
@@ -158,6 +244,17 @@ export default async function OpsCenterPage() {
                   <div>
                     <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Admin Path</label>
                     <code className="block text-xs bg-gray-100 text-gray-800 p-2 rounded mt-1 font-mono">{ADMIN_CONFIG.path}</code>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Jobs Created</p>
+                      <p className="text-lg font-semibold text-gray-900 mt-1">{formatNumber(stats.totalJobsCreated)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Active Jobs</p>
+                      <p className="text-lg font-semibold text-gray-900 mt-1">{formatNumber(stats.activeJobs)}</p>
+                    </div>
                   </div>
                 </div>
               </div>
