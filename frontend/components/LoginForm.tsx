@@ -3,15 +3,20 @@
 /* eslint-disable react/no-unescaped-entities */
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function LoginForm() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() => searchParams.get('error') ?? '');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { signIn, signInWithGoogle } = useAuth();
   const router = useRouter();
+
+  const redirectParam = searchParams.get('redirectTo');
+  const targetPath = redirectParam && redirectParam.startsWith('/') ? redirectParam : '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,8 +29,20 @@ export default function LoginForm() {
       setError(result.error);
       setLoading(false);
     } else {
-      router.push('/');
+      router.push(targetPath);
       router.refresh();
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setGoogleLoading(true);
+
+    const result = await signInWithGoogle(targetPath);
+
+    if (result?.error) {
+      setError(result.error);
+      setGoogleLoading(false);
     }
   };
 
@@ -77,6 +94,23 @@ export default function LoginForm() {
         >
           {loading ? 'Signing in...' : 'Sign In'}
         </button>
+
+        <div className="relative flex items-center justify-center text-center text-xs uppercase tracking-wide text-gray-400">
+          <span className="absolute left-0 top-1/2 h-px w-full bg-gray-200" aria-hidden />
+          <span className="relative z-10 bg-white px-2">or</span>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={googleLoading}
+          className="w-full border border-gray-300 bg-white text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {googleLoading ? 'Redirecting…' : 'Continue with Google'}
+        </button>
+        <p className="text-center text-xs text-gray-500">
+          Use your Google workspace admin email to access the Ops Center.
+        </p>
       </form>
 
       <div className="mt-4 text-center text-sm text-gray-600">
