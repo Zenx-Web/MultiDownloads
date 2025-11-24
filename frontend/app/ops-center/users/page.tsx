@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import type { User } from '@supabase/supabase-js';
 import { getAdminContext } from '../admin-utils';
 import { createAdminServerClient } from '@/lib/supabase/admin';
 
@@ -11,8 +12,13 @@ const USERS_PATH = '/ops-center/users';
 const encodeParam = (value: string) => encodeURIComponent(value);
 const decodeParam = (value?: string) => (value ? decodeURIComponent(value) : undefined);
 
-function buildRedirect(type: 'success' | 'error', message: string) {
-  return `${USERS_PATH}?${type}=${encodeParam(message)}`;
+function buildRedirect(
+  type: 'success' | 'error',
+  message: string,
+  extraParams: Record<string, string> = {}
+) {
+  const query = new URLSearchParams({ [type]: message, ...extraParams });
+  return `${USERS_PATH}?${query.toString()}`;
 }
 
 async function setUserLimitsAction(formData: FormData) {
@@ -141,16 +147,87 @@ async function addAdminNoteAction(formData: FormData) {
   redirect(buildRedirect('success', 'Note added to audit log'));
 }
 
+async function searchUserByEmailAction(formData: FormData) {
+  'use server';
+  const email = String(formData.get('searchEmail') || '').trim().toLowerCase();
+
+  if (!email) {
+    redirect(buildRedirect('error', 'Email is required to search'));
+  }
+
+  const adminClient = createAdminServerClient();
+  if (!adminClient) {
+    redirect(buildRedirect('error', 'Admin Supabase credentials missing'));
+  }
+
+  const perPage = 200;
+  let currentPage = 1;
+  let matchedUser: User | null = null;
+
+  while (currentPage <= 25) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page: currentPage, perPage });
+    if (error) {
+      redirect(buildRedirect('error', error.message));
+    }
+
+    const users = data?.users ?? [];
+    matchedUser = users.find((candidate) => candidate.email?.toLowerCase() === email) ?? null;
+    if (matchedUser) {
+      break;
+    }
+
+    if (users.length < perPage) {
+      break;
+    }
+
+    currentPage += 1;
+  }
+
+  if (!matchedUser) {
+    redirect(buildRedirect('error', 'No user found for that email'));
+  }
+
+  redirect(
+    buildRedirect('success', `Found ${matchedUser.email}`, {
+      userId: matchedUser.id,
+      prefillEmail: matchedUser.email ?? '',
+      userName: matchedUser.user_metadata?.full_name || matchedUser.user_metadata?.name || '',
+    })
+  );
+}
+
+async function fetchRecentUsers(limit: number): Promise<User[]> {
+  const adminClient = createAdminServerClient();
+  if (!adminClient) {
+    return [];
+  }
+
+  const { data, error } = await adminClient.auth.admin.listUsers({ page: 1, perPage: limit });
+  if (error || !data?.users) {
+    return [];
+  }
+
+  return [...data.users].sort((a, b) => {
+    const timeA = new Date(a.created_at ?? '').getTime();
+    const timeB = new Date(b.created_at ?? '').getTime();
+    return timeB - timeA;
+  });
+}
+
 type PageProps = {
   searchParams?: Record<string, string | string[] | undefined>;
 };
 
 export default async function UsersPanelPage({ searchParams }: PageProps) {
   const { user } = await getAdminContext();
+  const recentUsers = await fetchRecentUsers(3);
 
   const successMessage =
     typeof searchParams?.success === 'string' ? decodeParam(searchParams.success) : undefined;
   const errorMessage = typeof searchParams?.error === 'string' ? decodeParam(searchParams.error) : undefined;
+  const prefillUserId = typeof searchParams?.userId === 'string' ? searchParams.userId : '';
+  const prefillEmail = typeof searchParams?.prefillEmail === 'string' ? searchParams.prefillEmail : '';
+  const prefillName = typeof searchParams?.userName === 'string' ? searchParams.userName : '';
 
   return (
     <main className="min-h-screen bg-slate-50 py-10">
@@ -180,12 +257,41 @@ export default async function UsersPanelPage({ searchParams }: PageProps) {
         )}
 
         <section className="bg-white rounded-xl shadow p-6 space-y-6">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Subscription Controls</h2>
-            <p className="text-sm text-gray-500">
-              Update per-user limits, tiers, and usage buckets via the Supabase RPCs configured for this project.
-            </p>
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Subscription Controls</h2>
+              <p className="text-sm text-gray-500">
+                Update per-user limits, tiers, and usage buckets via the Supabase RPCs configured for this project.
+              </p>
+            </div>
+            <form action={searchUserByEmailAction} className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <label className="text-sm font-medium text-gray-700 sm:text-right">
+                Search by email
+                <input
+                  name="searchEmail"
+                  type="email"
+                  defaultValue={prefillEmail}
+                  className="mt-1 w-64 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="user@example.com"
+                  required
+                />
+              </label>
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-gray-800"
+              >
+                Search
+              </button>
+            </form>
           </div>
+
+          {prefillUserId && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              <p className="font-semibold">Selected user</p>
+              <p>{prefillName || prefillEmail}</p>
+              <p className="font-mono text-xs text-blue-700">{prefillUserId}</p>
+            </div>
+          )}
 
           <form action={setUserLimitsAction} className="grid gap-4 md:grid-cols-2">
             <label className="text-sm font-medium text-gray-700">
@@ -194,6 +300,7 @@ export default async function UsersPanelPage({ searchParams }: PageProps) {
                 name="userId"
                 className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 placeholder="c99c7ade-..."
+                defaultValue={prefillUserId}
                 required
               />
             </label>
@@ -256,6 +363,7 @@ export default async function UsersPanelPage({ searchParams }: PageProps) {
                   name="userId"
                   className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   placeholder="c99c7ade-..."
+                  defaultValue={prefillUserId}
                   required
                 />
               </label>
@@ -293,6 +401,7 @@ export default async function UsersPanelPage({ searchParams }: PageProps) {
                   name="userId"
                   className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   placeholder="c99c7ade-..."
+                  defaultValue={prefillUserId}
                   required
                 />
               </label>
@@ -313,6 +422,7 @@ export default async function UsersPanelPage({ searchParams }: PageProps) {
                 name="userId"
                 className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 placeholder="c99c7ade-..."
+                defaultValue={prefillUserId}
                 required
               />
             </label>
@@ -333,6 +443,54 @@ export default async function UsersPanelPage({ searchParams }: PageProps) {
               Save note
             </button>
           </form>
+        </section>
+
+        <section className="bg-white rounded-xl shadow p-6 space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Newest Users</h2>
+            <p className="text-sm text-gray-500">Latest three registrations pulled directly from Supabase Auth.</p>
+          </div>
+          <div className="overflow-hidden rounded-lg border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Email
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Name
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Created
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    User ID
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {recentUsers.map((recentUser) => (
+                  <tr key={recentUser.id}>
+                    <td className="px-4 py-2 text-sm text-gray-900">{recentUser.email}</td>
+                    <td className="px-4 py-2 text-sm text-gray-500">
+                      {recentUser.user_metadata?.full_name || recentUser.user_metadata?.name || '—'}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-500">
+                      {recentUser.created_at ? new Date(recentUser.created_at).toLocaleString() : '—'}
+                    </td>
+                    <td className="px-4 py-2 text-xs font-mono text-gray-500">{recentUser.id}</td>
+                  </tr>
+                ))}
+                {!recentUsers.length && (
+                  <tr>
+                    <td className="px-4 py-4 text-center text-sm text-gray-500" colSpan={4}>
+                      No users found yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
       </div>
     </main>
