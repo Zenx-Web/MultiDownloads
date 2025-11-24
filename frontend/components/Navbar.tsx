@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useRef, useState } from 'react';
+import { getRemainingDownloads, getUserPlan } from '@/lib/plans';
 
 const getDisplayName = (email?: string | null, metadata?: Record<string, any>) => {
   const candidate = metadata?.full_name || metadata?.name || metadata?.user_name || metadata?.preferred_username;
@@ -41,13 +42,16 @@ export default function Navbar() {
     : null;
   const displayName = user ? getDisplayName(user.email, metadata || undefined) : '';
   const avatarUrl = user ? getAvatarUrl(metadata || undefined) : '';
-  const planValue = metadata?.subscription_tier ? String(metadata.subscription_tier) : 'free';
-  const planLabel = planValue.charAt(0).toUpperCase() + planValue.slice(1);
-  const dailyLimitValue = metadata?.daily_limit as string | number | undefined;
-  const dailyLimitLabel = dailyLimitValue !== undefined && dailyLimitValue !== null ? String(dailyLimitValue) : '—';
-  const downloadsTodayValue = metadata?.downloads_today as string | number | undefined;
-  const downloadsTodayLabel =
-    downloadsTodayValue !== undefined && downloadsTodayValue !== null ? String(downloadsTodayValue) : '—';
+  const plan = getUserPlan(user || undefined);
+  // TODO: Replace downloads_today with the real usage counter coming from your API once available.
+  const downloadsUsedTodayRaw = Number(metadata?.downloads_today ?? metadata?.downloadsUsedToday ?? 0);
+  const downloadsUsedToday = Number.isFinite(downloadsUsedTodayRaw) ? Math.max(downloadsUsedTodayRaw, 0) : 0;
+  const remainingDownloads = getRemainingDownloads(plan, downloadsUsedToday);
+  const downloadsSummary =
+    plan.dailyLimit === null
+      ? 'Unlimited downloads'
+      : `${downloadsUsedToday}/${plan.dailyLimit} downloads today`;
+  const priceLabel = `₹${plan.priceMonthly}/month`;
 
   useEffect(() => {
     if (!profileMenuOpen) return;
@@ -157,7 +161,7 @@ export default function Navbar() {
                       {displayName}
                     </span>
                     <span className="text-xs text-gray-500 capitalize">
-                      {planLabel}
+                      {plan.label}
                     </span>
                   </div>
                   <svg
@@ -193,15 +197,15 @@ export default function Navbar() {
                   <div className="px-4 py-4 text-sm text-gray-600 space-y-3">
                     <div className="flex items-center justify-between">
                       <span>Plan</span>
-                      <span className="font-semibold capitalize">{planLabel}</span>
+                      <span className="font-semibold capitalize">{plan.label}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Daily limit</span>
-                      <span className="font-semibold">{dailyLimitLabel}</span>
+                      <span>Price</span>
+                      <span className="font-semibold">{priceLabel}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Downloads today</span>
-                      <span className="font-semibold">{downloadsTodayLabel}</span>
+                      <span>Status</span>
+                      <span className="font-semibold">{downloadsSummary}</span>
                     </div>
                   </div>
                   <div className="border-t border-gray-100">
@@ -284,11 +288,15 @@ export default function Navbar() {
                   <div className="mt-3 space-y-1 text-xs text-gray-600">
                     <div className="flex justify-between">
                       <span>Plan</span>
-                      <span className="font-semibold capitalize">{planLabel}</span>
+                      <span className="font-semibold capitalize">{plan.label}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Daily limit</span>
-                      <span className="font-semibold">{dailyLimitLabel}</span>
+                      <span>Price</span>
+                      <span className="font-semibold">{priceLabel}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Status</span>
+                      <span className="font-semibold">{downloadsSummary}</span>
                     </div>
                   </div>
                 </div>
