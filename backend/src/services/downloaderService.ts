@@ -681,7 +681,9 @@ export const downloadInstagramVideo = async (
           if (fs.existsSync(outputPath)) {
             fs.unlinkSync(outputPath);
           }
-        } catch {}
+        } catch (cleanupError) {
+          console.warn('Failed to clean up Instagram download after error:', cleanupError);
+        }
         reject(new Error(`Instagram download failed: ${error.message}`));
       });
     });
@@ -783,7 +785,9 @@ export const downloadFacebookVideo = async (
           if (fs.existsSync(outputPath)) {
             fs.unlinkSync(outputPath);
           }
-        } catch {}
+        } catch (cleanupError) {
+          console.warn('Failed to clean up Facebook download after error:', cleanupError);
+        }
         reject(new Error(`Facebook download failed: ${error.message}`));
       });
     });

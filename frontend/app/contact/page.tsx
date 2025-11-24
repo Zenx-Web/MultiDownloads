@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+/* eslint-disable react/no-unescaped-entities */
 import type { Metadata } from 'next';
 
 export default function ContactPage() {

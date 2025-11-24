@@ -73,6 +73,25 @@ frontend/
    NEXT_PUBLIC_API_URL=http://localhost:5000/api
    ```
 
+### Admin Control Room
+
+1. Set the secret path and allow list in `.env.local`:
+   ```env
+   ADMIN_DASHBOARD_PATH=/ops-center
+   ADMIN_ALLOWED_EMAILS=owner@example.com,ops@example.com
+   ADMIN_ALLOWED_ROLES=admin
+   ```
+2. Make sure the selected path matches the folder under `app/` (default: `app/ops-center`). If you change the env path, rename the folder to keep them in sync.
+3. Only users whose Supabase email or metadata role matches the allow list (or who have `is_admin` flags) will pass the middleware gate.
+4. The route is intentionally missing from navigation. Share the URL manually with trusted staff and rotate it if exposure is suspected.
+
+### Production Secrets & Hardening
+
+- Never commit real `.env` files (including `.env.production`) to the repository. Add them to your deployment provider instead (Vercel ➜ Project Settings ➜ Environment Variables, Fly.io ➜ `fly secrets`, etc.).
+- After pulling this repo, create your own `.env.local` for local testing and keep production credentials only in secure secret stores.
+- Rotate any keys that were previously committed (Supabase service role, anon keys, etc.) and update the remote environments before deploying.
+- Before each release, run `npm run lint` and `npm run build` in both `backend/` and `frontend/` to catch dev-only imports or experimental flags that should not reach production.
+
 4. **Run development server**:
    ```powershell
    npm run dev

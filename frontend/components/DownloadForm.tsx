@@ -1,5 +1,6 @@
 'use client';
 
+/* eslint-disable react/no-unescaped-entities */
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import CookieConsent from './CookieConsent';

@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable react/no-unescaped-entities */
+
 export default function PricingPage() {
   return (
     <div className="container mx-auto px-4 py-12">

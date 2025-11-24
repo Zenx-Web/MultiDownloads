@@ -3,6 +3,8 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import QRCode from 'qrcode';
 import sharp from 'sharp';
+import colorThief from 'colorthief';
+import toIco from 'to-ico';
 import { updateJob } from './jobService';
 
 const uploadsDir = path.resolve(process.cwd(), 'uploads');
@@ -158,12 +160,11 @@ export const extractColorPalette = async (
   jobId: string
 ): Promise<string[]> => {
   ensureUploadsDir();
-  const ColorThief = require('colorthief');
 
   let palette: number[][] | null = null;
   let usedFallback = false;
   try {
-    palette = await ColorThief.getPalette(inputPath, colorCount);
+    palette = await colorThief.getPalette(inputPath, colorCount);
   } catch (error) {
     console.warn(`⚠ ColorThief failed for palette job ${jobId}:`, (error as Error).message);
   }
@@ -294,7 +295,6 @@ export const generateFavicon = async (
   jobId: string
 ): Promise<string> => {
   ensureUploadsDir();
-  const toIco = require('to-ico');
   
   // Generate multiple sizes
   const sizes = [16, 32, 48];
