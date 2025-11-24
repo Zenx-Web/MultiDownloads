@@ -1,83 +1,16 @@
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
-import { ADMIN_CONFIG, isAdminUser } from '@/lib/admin/access';
+import { revalidatePath } from 'next/cache';
+import { ADMIN_CONFIG } from '@/lib/admin/access';
+import { getAdminContext } from './admin-utils';
+import { fetchSystemStats, type AdminStats } from './system-stats';
 
-export const dynamic = 'force-dynamic';
-
-async function getCurrentUser() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
-}
-
-type AdminStats = {
-  totalJobsTracked: number;
-  totalJobsCreated: number;
-  jobsPending: number;
-  jobsProcessing: number;
-  jobsCompleted: number;
-  jobsFailed: number;
-  jobsQueued: number;
-  activeJobs: number;
-  successRate: number;
-  uptimeSeconds: number;
-  startedAt: string;
-  lastUpdated: string;
-};
-
-const defaultStats: AdminStats = {
-  totalJobsTracked: 0,
-  totalJobsCreated: 0,
-  jobsPending: 0,
-  jobsProcessing: 0,
-  jobsCompleted: 0,
-  jobsFailed: 0,
-  jobsQueued: 0,
-  activeJobs: 0,
-  successRate: 100,
-  uptimeSeconds: 0,
-  startedAt: new Date().toISOString(),
-  lastUpdated: new Date().toISOString(),
-};
-
-const resolveAdminApiBase = () => {
-  const explicit = process.env.ADMIN_BACKEND_URL;
-  const fallback = process.env.NEXT_PUBLIC_API_URL;
-  const base = explicit || fallback || 'http://localhost:5000/api';
-  return base.replace(/\/$/, '');
-};
-
-async function fetchSystemStats(): Promise<AdminStats> {
-  try {
-    const baseUrl = resolveAdminApiBase();
-    const response = await fetch(`${baseUrl}/admin/stats`, {
-      cache: 'no-store',
-      next: { revalidate: 0 },
-    });
-
-    if (!response.ok) {
-      return defaultStats;
-    }
-
-    const payload = await response.json();
-    return { ...defaultStats, ...(payload?.data as Partial<AdminStats>) };
-  } catch (error) {
-    return defaultStats;
-  }
+async function refreshStatsAction() {
+  'use server';
+  revalidatePath('/ops-center');
 }
 
 export default async function OpsCenterPage() {
-  const user = await getCurrentUser();
-  const metadataRoles: string[] = Array.isArray(user?.app_metadata?.roles)
-    ? (user?.app_metadata?.roles as string[])
-    : [];
-
-  if (!isAdminUser(user)) {
-    redirect('/');
-  }
+  const { user, metadataRoles } = await getAdminContext();
 
   const stats = await fetchSystemStats();
 
@@ -283,9 +216,12 @@ export default async function OpsCenterPage() {
                       <li>• Reset usage counters</li>
                       <li>• View user analytics</li>
                     </ul>
-                    <button className="mt-4 w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium">
+                    <Link
+                      href="/ops-center/users"
+                      className="mt-4 inline-flex w-full justify-center bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
                       Open User Panel
-                    </button>
+                    </Link>
                   </div>
 
                   {/* System Monitoring */}
@@ -302,9 +238,12 @@ export default async function OpsCenterPage() {
                       <li>• Error logs and alerts</li>
                       <li>• API rate limiting</li>
                     </ul>
-                    <button className="mt-4 w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm font-medium">
+                    <Link
+                      href="/ops-center/metrics"
+                      className="mt-4 inline-flex w-full justify-center bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
+                    >
                       View Metrics
-                    </button>
+                    </Link>
                   </div>
 
                   {/* Content Management */}
@@ -321,9 +260,12 @@ export default async function OpsCenterPage() {
                       <li>• Maintenance mode</li>
                       <li>• Cache management</li>
                     </ul>
-                    <button className="mt-4 w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors text-sm font-medium">
+                    <Link
+                      href="/ops-center/tools"
+                      className="mt-4 inline-flex w-full justify-center bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors text-sm font-medium"
+                    >
                       Manage Tools
-                    </button>
+                    </Link>
                   </div>
 
                   {/* Security & Logs */}
@@ -340,9 +282,12 @@ export default async function OpsCenterPage() {
                       <li>• Access logs</li>
                       <li>• IP allowlists</li>
                     </ul>
-                    <button className="mt-4 w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-sm font-medium">
+                    <Link
+                      href="/ops-center/security"
+                      className="mt-4 inline-flex w-full justify-center bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-sm font-medium"
+                    >
                       Security Center
-                    </button>
+                    </Link>
                   </div>
                 </div>
 
@@ -362,12 +307,17 @@ export default async function OpsCenterPage() {
                       </svg>
                       Tool Settings
                     </Link>
-                    <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-gray-800 hover:bg-gray-900 transition-colors">
-                      <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd"/>
-                      </svg>
-                      Refresh Data
-                    </button>
+                    <form action={refreshStatsAction}>
+                      <button
+                        type="submit"
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-gray-800 hover:bg-gray-900 transition-colors"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd"/>
+                        </svg>
+                        Refresh Data
+                      </button>
+                    </form>
                   </div>
                 </div>
               </div>
