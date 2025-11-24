@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import type { User } from '@supabase/supabase-js';
 import { getAdminContext } from '../admin-utils';
 import { createAdminServerClient } from '@/lib/supabase/admin';
+import StatusToast from '@/components/StatusToast';
 
 export const dynamic = 'force-dynamic';
 
@@ -228,9 +229,14 @@ export default async function UsersPanelPage({ searchParams }: PageProps) {
   const prefillUserId = typeof searchParams?.userId === 'string' ? searchParams.userId : '';
   const prefillEmail = typeof searchParams?.prefillEmail === 'string' ? searchParams.prefillEmail : '';
   const prefillName = typeof searchParams?.userName === 'string' ? searchParams.userName : '';
+  const toastMessage = successMessage || errorMessage || '';
+  const toastVariant: 'success' | 'error' = successMessage ? 'success' : 'error';
+  const showToast = Boolean(successMessage || errorMessage);
 
   return (
-    <main className="min-h-screen bg-slate-50 py-10">
+    <>
+      {showToast && <StatusToast message={toastMessage} variant={toastVariant} />}
+      <main className="min-h-screen bg-slate-50 py-10">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         <div className="flex items-center justify-between">
           <div>
@@ -245,16 +251,6 @@ export default async function UsersPanelPage({ searchParams }: PageProps) {
             ← Back to Ops Center
           </Link>
         </div>
-
-        {(successMessage || errorMessage) && (
-          <div
-            className={`rounded-lg border px-4 py-3 text-sm ${
-              successMessage ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-700'
-            }`}
-          >
-            {successMessage || errorMessage}
-          </div>
-        )}
 
         <section className="bg-white rounded-xl shadow p-6 space-y-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -494,5 +490,6 @@ export default async function UsersPanelPage({ searchParams }: PageProps) {
         </section>
       </div>
     </main>
+    </>
   );
 }
