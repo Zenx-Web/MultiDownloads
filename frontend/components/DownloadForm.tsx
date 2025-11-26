@@ -121,6 +121,11 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
               downloadUrl: job.downloadUrl,
             }));
             clearInterval(interval);
+            
+            // If job includes updated usage count, use it for optimistic update
+            if (typeof job.downloadsUsedToday === 'number') {
+              refreshSubscription();
+            }
           } else if (job.status === 'failed') {
             setDownloadState(prev => ({
               ...prev,
@@ -136,7 +141,7 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
 
       return () => clearInterval(interval);
     }
-  }, [downloadState.jobId, downloadState.status, authHeaders]);
+  }, [downloadState.jobId, downloadState.status, authHeaders, refreshSubscription]);
 
   const handleDownloadClick = async () => {
     // First click: Fetch info and start download

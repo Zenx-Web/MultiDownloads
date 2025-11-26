@@ -66,9 +66,16 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/me/subscription', {
+      // Add timestamp to prevent any aggressive caching
+      const timestamp = Date.now();
+      const response = await fetch(`/api/me/subscription?_=${timestamp}`, {
         credentials: 'include',
         cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       });
 
       if (response.status === 401) {

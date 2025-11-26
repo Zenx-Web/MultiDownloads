@@ -5,7 +5,7 @@ import { detectPlatform, isValidUrl } from '../services/urlService';
 import { downloadMedia, getMediaInfo } from '../services/downloaderService';
 import { ApiError } from '../middlewares/errorHandler';
 import { incrementDownloadCount, decrementConcurrentCount, validateQualityLimit } from '../middlewares/tierLimits';
-import { recordDownloadUsage } from '../services/usageService';
+import { recordDownloadUsage, canUserDownload } from '../services/usageService';
 import { JOB_FAILURE_MESSAGE, logAndExtractError } from '../utils/errorUtils';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -77,6 +77,14 @@ export const initiateDownload = async (
       return next(new ApiError(400, 'Invalid URL provided'));
     }
 
+    // Check user's download limit if authenticated
+    if (userId) {
+      const limitCheck = await canUserDownload(userId);
+      if (!limitCheck.allowed) {
+        return next(new ApiError(403, limitCheck.reason || 'Download limit exceeded'));
+      }
+    }
+
     // Get user limits from middleware
     const userLimits = (req as any).userLimits;
 
@@ -143,17 +151,20 @@ const processDownload = async (
 
     const filePath = await downloadMedia(url, platform, quality, format, jobId, cookies);
 
+    // Record usage and get updated count
+    let downloadsUsedToday = 0;
+    if (userId) {
+      downloadsUsedToday = await recordDownloadUsage(userId);
+    }
+
     updateJob(jobId, {
       status: 'completed',
       progress: 100,
       filePath,
       downloadUrl: `/api/download/file/${jobId}`,
       message: 'Download completed successfully!',
+      ...(userId && { downloadsUsedToday }), // Include usage info if authenticated
     });
-
-    if (userId) {
-      await recordDownloadUsage(userId);
-    }
   } catch (error) {
     logAndExtractError('downloadController.processDownload', error);
     updateJob(jobId, {
