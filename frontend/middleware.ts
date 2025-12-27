@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { ADMIN_CONFIG, isAdminUser } from '@/lib/admin/access';
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -60,7 +61,23 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh session if expired - required for Server Components
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname.replace(/\/$/, '') || '/';
+  const isAdminRoute = pathname === ADMIN_CONFIG.path || pathname.startsWith(`${ADMIN_CONFIG.path}/`);
+
+  if (isAdminRoute && !isAdminUser(user)) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = '/login';
+    redirectUrl.searchParams.set('redirectTo', request.nextUrl.pathname + request.nextUrl.search);
+    const redirectResponse = NextResponse.redirect(redirectUrl);
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie);
+    });
+    return redirectResponse;
+  }
 
   return response;
 }

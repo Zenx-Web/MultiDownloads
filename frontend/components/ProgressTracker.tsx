@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { downloadFileFromApi } from '@/lib/fileDownload';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -24,11 +26,25 @@ export default function ProgressTracker({ jobId, onReset }: ProgressTrackerProps
   const [job, setJob] = useState<JobStatus | null>(null);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [usageRefreshed, setUsageRefreshed] = useState(false);
+  const { refresh: refreshSubscription } = useSubscription();
+  const { session } = useAuth();
+  const authToken = session?.access_token || null;
+  const authHeaders = useMemo(() => {
+    if (!authToken) {
+      return undefined;
+    }
+    return {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    };
+  }, [authToken]);
 
   useEffect(() => {
     const pollStatus = async () => {
       try {
-        const response = await axios.get(`${API_URL}/status/${jobId}`);
+        const response = await axios.get(`${API_URL}/status/${jobId}`, authHeaders);
         
         if (response.data.success) {
           setJob(response.data.data);
@@ -54,7 +70,20 @@ export default function ProgressTracker({ jobId, onReset }: ProgressTrackerProps
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [jobId, job?.status]);
+  }, [jobId, job?.status, authHeaders]);
+
+  useEffect(() => {
+    if (job?.status === 'completed' && !usageRefreshed) {
+      refreshSubscription().catch((refreshError) => {
+        console.warn('[subscription] unable to refresh after job completion', refreshError);
+      });
+      setUsageRefreshed(true);
+    }
+
+    if (job?.status !== 'completed' && usageRefreshed) {
+      setUsageRefreshed(false);
+    }
+  }, [job?.status, usageRefreshed, refreshSubscription]);
 
   const getStatusColor = () => {
     switch (job?.status) {
@@ -124,6 +153,9 @@ export default function ProgressTracker({ jobId, onReset }: ProgressTrackerProps
                 setError('');
                 try {
                   await downloadFileFromApi(job.downloadUrl, API_URL);
+                  refreshSubscription().catch((refreshError) => {
+                    console.warn('[subscription] unable to refresh after download', refreshError);
+                  });
                 } catch (err) {
                   console.error('Download failed:', err);
                   setError(err instanceof Error ? err.message : 'Failed to download file');

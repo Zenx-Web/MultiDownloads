@@ -7,6 +7,7 @@ import { convertVideo, convertVideoToAudio, convertImage } from '../services/con
 import { ApiError } from '../middlewares/errorHandler';
 import { config } from '../config';
 import { incrementDownloadCount, decrementConcurrentCount } from '../middlewares/tierLimits';
+import { JOB_FAILURE_MESSAGE, logAndExtractError } from '../utils/errorUtils';
 
 const RESOLUTION_PRESETS: Record<string, string> = {
   '360p': '640x360',
@@ -75,13 +76,15 @@ export const convertVideoHandler = async (
     // Process conversion asynchronously
     const normalizedResolution = normalizeResolution(targetResolution);
 
-    processVideoConversion(job.id, file.path, targetFormat, normalizedResolution, req)
-      .catch((error) => {
+    processVideoConversion(job.id, file.path, targetFormat, normalizedResolution, req).catch(
+      (error) => {
+        logAndExtractError('convertController.processVideoConversionUncaught', error);
         updateJob(job.id, {
           status: 'failed',
-          error: error.message,
+          error: JOB_FAILURE_MESSAGE,
         });
-      });
+      }
+    );
 
     res.json({
       success: true,
@@ -94,7 +97,8 @@ export const convertVideoHandler = async (
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new ApiError(500, `Video conversion failed: ${(error as Error).message}`);
+    logAndExtractError('convertController.convertVideoHandler', error);
+    throw new ApiError(500, 'Video conversion could not be completed. Please try again later.');
   }
 };
 
@@ -116,9 +120,10 @@ const processVideoConversion = async (
       message: 'Video conversion completed!',
     });
   } catch (error) {
+    logAndExtractError('convertController.processVideoConversion', error);
     updateJob(jobId, {
       status: 'failed',
-      error: (error as Error).message,
+      error: JOB_FAILURE_MESSAGE,
     });
   } finally {
     decrementConcurrentCount(req);
@@ -149,13 +154,13 @@ export const convertAudioHandler = async (
     incrementDownloadCount(req);
 
     // Process conversion asynchronously
-    processAudioConversion(job.id, file.path, targetFormat, bitrate, req)
-      .catch((error) => {
-        updateJob(job.id, {
-          status: 'failed',
-          error: error.message,
-        });
+    processAudioConversion(job.id, file.path, targetFormat, bitrate, req).catch((error) => {
+      logAndExtractError('convertController.processAudioConversionUncaught', error);
+      updateJob(job.id, {
+        status: 'failed',
+        error: JOB_FAILURE_MESSAGE,
       });
+    });
 
     res.json({
       success: true,
@@ -168,7 +173,8 @@ export const convertAudioHandler = async (
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new ApiError(500, `Audio conversion failed: ${(error as Error).message}`);
+    logAndExtractError('convertController.convertAudioHandler', error);
+    throw new ApiError(500, 'Audio conversion could not be completed. Please try again later.');
   }
 };
 
@@ -190,9 +196,10 @@ const processAudioConversion = async (
       message: 'Audio conversion completed!',
     });
   } catch (error) {
+    logAndExtractError('convertController.processAudioConversion', error);
     updateJob(jobId, {
       status: 'failed',
-      error: (error as Error).message,
+      error: JOB_FAILURE_MESSAGE,
     });
   } finally {
     decrementConcurrentCount(req);
@@ -232,9 +239,10 @@ export const convertImageHandler = async (
       quality ? parseInt(quality as any) : undefined,
       req
     ).catch((error) => {
+      logAndExtractError('convertController.processImageConversionUncaught', error);
       updateJob(job.id, {
         status: 'failed',
-        error: error.message,
+        error: JOB_FAILURE_MESSAGE,
       });
     });
 
@@ -249,7 +257,8 @@ export const convertImageHandler = async (
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new ApiError(500, `Image conversion failed: ${(error as Error).message}`);
+    logAndExtractError('convertController.convertImageHandler', error);
+    throw new ApiError(500, 'Image conversion could not be completed. Please try again later.');
   }
 };
 
@@ -273,9 +282,10 @@ const processImageConversion = async (
       message: 'Image conversion completed!',
     });
   } catch (error) {
+    logAndExtractError('convertController.processImageConversion', error);
     updateJob(jobId, {
       status: 'failed',
-      error: (error as Error).message,
+      error: JOB_FAILURE_MESSAGE,
     });
   } finally {
     decrementConcurrentCount(req);

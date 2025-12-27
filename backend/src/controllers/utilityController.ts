@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createJob, updateJob } from '../services/jobService';
 import * as utilityService from '../services/utilityService';
+import { JOB_FAILURE_MESSAGE, logAndExtractError } from '../utils/errorUtils';
 
 // Multer storage configuration
 const uploadsDir = path.resolve(process.cwd(), 'uploads');
@@ -42,10 +43,10 @@ export const generateQRCodeHandler = async (req: Request, res: Response): Promis
 
     // Process in background
     utilityService.generateQRCode(text, Number(size), job.id).catch((error: Error) => {
-      console.error('QR generation error:', error);
+      logAndExtractError('utilityController.generateQRCode', error);
       updateJob(job.id, {
         status: 'failed',
-        error: error.message,
+        error: JOB_FAILURE_MESSAGE,
       });
     });
   } catch (error) {
@@ -75,10 +76,10 @@ export const generateHashHandler = [
       utilityService
         .generateHash(file?.path || null, text || null, algorithm, job.id)
         .catch((error: Error) => {
-          console.error('Hash generation error:', error);
+          logAndExtractError('utilityController.generateHash', error);
           updateJob(job.id, {
             status: 'failed',
-            error: error.message,
+            error: JOB_FAILURE_MESSAGE,
           });
         });
     } catch (error) {
@@ -104,10 +105,10 @@ export const formatTextHandler = async (req: Request, res: Response): Promise<vo
 
     // Process in background
     utilityService.formatText(text, operation, job.id).catch((error: Error) => {
-      console.error('Text formatting error:', error);
+      logAndExtractError('utilityController.formatText', error);
       updateJob(job.id, {
         status: 'failed',
-        error: error.message,
+        error: JOB_FAILURE_MESSAGE,
       });
     });
   } catch (error) {
@@ -137,10 +138,10 @@ export const extractColorPaletteHandler = [
       utilityService
         .extractColorPalette(file.path, Number(colorCount), job.id)
         .catch((error: Error) => {
-          console.error('Color extraction error:', error);
+          logAndExtractError('utilityController.extractColorPalette', error);
           updateJob(job.id, {
             status: 'failed',
-            error: error.message,
+            error: JOB_FAILURE_MESSAGE,
           });
         });
     } catch (error) {
@@ -168,10 +169,10 @@ export const generateFaviconHandler = [
 
       // Process in background
       utilityService.generateFavicon(file.path, job.id).catch((error: Error) => {
-        console.error('Favicon generation error:', error);
+        logAndExtractError('utilityController.generateFavicon', error);
         updateJob(job.id, {
           status: 'failed',
-          error: error.message,
+          error: JOB_FAILURE_MESSAGE,
         });
       });
     } catch (error) {

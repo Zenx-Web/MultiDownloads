@@ -5,6 +5,7 @@ import authRoutes from './authRoutes';
 import documentRoutes from './documentRoutes';
 import utilityRoutes from './utilityRoutes';
 import mediaRoutes from './mediaRoutes';
+import adminRoutes from './adminRoutes';
 import { getJobStatus } from '../controllers/downloadController';
 
 const router = Router();
@@ -16,6 +17,7 @@ router.use('/auth', authRoutes);
 router.use('/document', documentRoutes);
 router.use('/utility', utilityRoutes);
 router.use('/media', mediaRoutes);
+router.use('/admin', adminRoutes);
 
 // Status endpoint at root level
 router.get('/status/:jobId', getJobStatus);

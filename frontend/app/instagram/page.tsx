@@ -1,5 +1,6 @@
 'use client';
 
+/* eslint-disable react/no-unescaped-entities */
 import { useState } from 'react';
 import DownloadForm from '@/components/DownloadForm';
 import ProgressTracker from '@/components/ProgressTracker';

@@ -5,6 +5,8 @@ import { detectPlatform, isValidUrl } from '../services/urlService';
 import { downloadMedia, getMediaInfo } from '../services/downloaderService';
 import { ApiError } from '../middlewares/errorHandler';
 import { incrementDownloadCount, decrementConcurrentCount, validateQualityLimit } from '../middlewares/tierLimits';
+import { recordDownloadUsage, canUserDownload } from '../services/usageService';
+import { JOB_FAILURE_MESSAGE, logAndExtractError } from '../utils/errorUtils';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -35,8 +37,8 @@ export const getVideoInfo = async (
     if (error instanceof ApiError) {
       return next(error);
     }
-    
-    const errorMessage = (error as Error).message;
+
+    const errorMessage = logAndExtractError('downloadController.getVideoInfo', error);
     
     // Check for bot detection or rate limiting
     if (errorMessage.includes('Sign in to confirm') || 
@@ -52,7 +54,7 @@ export const getVideoInfo = async (
       return;
     }
     
-    return next(new ApiError(500, `Failed to fetch video info: ${errorMessage}`));
+    return next(new ApiError(500, 'Unable to fetch video info at the moment. Please try again later.'));
   }
 };
 
@@ -61,16 +63,26 @@ export const getVideoInfo = async (
  * Initiate a media download from supported platforms
  */
 export const initiateDownload = async (
-  req: Request<{}, {}, DownloadRequest>,
+  req: Request<Record<string, never>, ApiResponse, DownloadRequest>,
   res: Response<ApiResponse>,
   next: NextFunction
 ) => {
   try {
     const { url, platform: requestedPlatform, quality = '720', format = 'mp4', cookies } = req.body;
+    const authUser = (req as any).user as { id?: string } | undefined;
+    const userId = authUser?.id || null;
 
     // Validate URL
     if (!url || !isValidUrl(url)) {
       return next(new ApiError(400, 'Invalid URL provided'));
+    }
+
+    // Check user's download limit if authenticated
+    if (userId) {
+      const limitCheck = await canUserDownload(userId);
+      if (!limitCheck.allowed) {
+        return next(new ApiError(403, limitCheck.reason || 'Download limit exceeded'));
+      }
     }
 
     // Get user limits from middleware
@@ -96,13 +108,13 @@ export const initiateDownload = async (
     incrementDownloadCount(req);
 
     // Start download asynchronously
-    processDownload(job.id, url, platform, quality, format, req, cookies)
-      .catch((error) => {
-        updateJob(job.id, {
-          status: 'failed',
-          error: error.message,
-        });
+    processDownload(job.id, url, platform, quality, format, req, cookies, userId).catch((error) => {
+      logAndExtractError('downloadController.processDownloadUncaught', error);
+      updateJob(job.id, {
+        status: 'failed',
+        error: JOB_FAILURE_MESSAGE,
       });
+    });
 
     // Return job ID immediately
     res.json({
@@ -116,7 +128,8 @@ export const initiateDownload = async (
     if (error instanceof ApiError) {
       return next(error);
     }
-    return next(new ApiError(500, `Download initiation failed: ${(error as Error).message}`));
+    logAndExtractError('downloadController.initiateDownload', error);
+    return next(new ApiError(500, 'Unable to start download right now. Please try again later.'));
   }
 };
 
@@ -130,12 +143,19 @@ const processDownload = async (
   quality: string,
   format: string,
   req: Request,
-  cookies?: string
+  cookies?: string,
+  userId?: string | null
 ) => {
   try {
     updateJob(jobId, { status: 'processing', progress: 5 });
 
     const filePath = await downloadMedia(url, platform, quality, format, jobId, cookies);
+
+    // Record usage and get updated count
+    let downloadsUsedToday = 0;
+    if (userId) {
+      downloadsUsedToday = await recordDownloadUsage(userId);
+    }
 
     updateJob(jobId, {
       status: 'completed',
@@ -143,11 +163,13 @@ const processDownload = async (
       filePath,
       downloadUrl: `/api/download/file/${jobId}`,
       message: 'Download completed successfully!',
+      ...(userId && { downloadsUsedToday }), // Include usage info if authenticated
     });
   } catch (error) {
+    logAndExtractError('downloadController.processDownload', error);
     updateJob(jobId, {
       status: 'failed',
-      error: (error as Error).message,
+      error: JOB_FAILURE_MESSAGE,
     });
   } finally {
     // Decrement concurrent counter

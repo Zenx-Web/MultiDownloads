@@ -294,6 +294,12 @@ SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 ```
 
+### Google OAuth for Admin Access
+
+1. In Supabase Dashboard → Authentication → Providers, enable **Google** and supply the OAuth credentials from Google Cloud Console.
+2. Add the following URL to the list of authorized redirects in both Supabase and Google: `https://your-domain.com/auth/callback` (include the localhost variant for local development, e.g., `http://localhost:3000/auth/callback`).
+3. Make sure the Google workspace accounts you want to allow are included in `ADMIN_ALLOWED_EMAILS` or have an admin role so the middleware grants Ops Center access.
+
 ## Getting Supabase Credentials
 
 1. Go to [supabase.com](https://supabase.com)

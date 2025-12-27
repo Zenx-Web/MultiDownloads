@@ -3,6 +3,8 @@ import * as path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import sharp from 'sharp';
 import puppeteer from 'puppeteer';
+// @ts-ignore - no types available
+import createGtts from 'node-gtts';
 import { updateJob } from './jobService';
 import { config } from '../config';
 
@@ -262,7 +264,7 @@ export const textToSpeech = async (
   language: string,
   jobId: string
 ): Promise<string> => {
-  const gtts = require('node-gtts')(language);
+  const gtts = createGtts(language);
   const outputPath = path.join('uploads', `tts-${jobId}.mp3`);
 
   return new Promise((resolve, reject) => {

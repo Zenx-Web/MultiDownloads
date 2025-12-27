@@ -12,6 +12,7 @@ interface AuthContextType {
   loading: boolean;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error?: string }>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
+  signInWithGoogle: (redirectPath?: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error?: string }>;
   signInWithGoogle: () => Promise<{ error?: string }>;
@@ -76,6 +77,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return {};
   };
 
+  const signInWithGoogle = async (redirectPath?: string) => {
+    if (typeof window === 'undefined') {
+      return { error: 'Google sign-in is only available in the browser' };
+    }
+
+    const origin = window.location.origin;
+    const safeRedirect = redirectPath && redirectPath.startsWith('/') ? redirectPath : '/';
+    const callbackUrl = new URL('/auth/callback', origin);
+
+    if (safeRedirect) {
+      callbackUrl.searchParams.set('next', safeRedirect);
+    }
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: callbackUrl.toString(),
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    return {};
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
@@ -128,6 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         signUp,
         signIn,
+        signInWithGoogle,
         signOut,
         resetPassword,
         signInWithGoogle,

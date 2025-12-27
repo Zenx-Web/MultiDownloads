@@ -6,6 +6,8 @@ import { JobStatus } from '../types';
  * TODO: Move to Redis or database for production scalability
  */
 const jobStore = new Map<string, JobStatus>();
+let totalJobsCreated = 0;
+const serviceStartTime = new Date();
 
 /**
  * Create a new job and return its ID
@@ -20,6 +22,7 @@ export const createJob = (): JobStatus => {
   };
 
   jobStore.set(job.id, job);
+  totalJobsCreated += 1;
   return job;
 };
 
@@ -61,3 +64,53 @@ export const cleanupOldJobs = () => {
 
 // Run cleanup every 30 minutes
 setInterval(cleanupOldJobs, 30 * 60 * 1000);
+
+const summarizeStatuses = () => {
+  let pending = 0;
+  let processing = 0;
+  let completed = 0;
+  let failed = 0;
+
+  for (const job of jobStore.values()) {
+    switch (job.status) {
+      case 'pending':
+        pending += 1;
+        break;
+      case 'processing':
+        processing += 1;
+        break;
+      case 'completed':
+        completed += 1;
+        break;
+      case 'failed':
+        failed += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return { pending, processing, completed, failed };
+};
+
+export const getSystemStats = () => {
+  const { pending, processing, completed, failed } = summarizeStatuses();
+  const totalTracked = jobStore.size;
+  const finishedJobs = completed + failed;
+  const successRate = finishedJobs === 0 ? 100 : Math.round((completed / finishedJobs) * 100);
+
+  return {
+    totalJobsTracked: totalTracked,
+    totalJobsCreated,
+    jobsPending: pending,
+    jobsProcessing: processing,
+    jobsCompleted: completed,
+    jobsFailed: failed,
+    jobsQueued: pending,
+    activeJobs: processing,
+    successRate,
+    uptimeSeconds: Math.floor((Date.now() - serviceStartTime.getTime()) / 1000),
+    startedAt: serviceStartTime.toISOString(),
+    lastUpdated: new Date().toISOString(),
+  };
+};

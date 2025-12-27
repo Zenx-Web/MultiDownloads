@@ -31,7 +31,9 @@ yarn-error.log*
 .env*.local
 .env.development.local
 .env.test.local
+.env.production
 .env.production.local
+frontend/.env.production
 
 # Vercel
 .vercel
@@ -94,6 +96,5 @@ logs/
 *.log
 
 # Lock files (optional - uncomment if you want to ignore)
-# package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
