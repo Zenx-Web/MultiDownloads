@@ -81,6 +81,34 @@ export const signInHandler = async (req: Request, res: Response) => {
   }
 };
 
+export const googleSignInHandler = async (req: Request, res: Response) => {
+  try {
+    const { redirectTo } = req.body;
+
+    const result = await authService.signInWithProvider('google', redirectTo);
+
+    if (result.error || !result.url) {
+      return res.status(400).json({
+        success: false,
+        message: result.error || 'Unable to start Google sign-in',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        url: result.url,
+      },
+    });
+  } catch (error) {
+    console.error('Google sign-in start error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to initiate Google sign-in',
+    });
+  }
+};
+
 /**
  * Sign out the current user
  */

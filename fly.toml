@@ -12,6 +12,7 @@ primary_region = 'iad'
 [env]
   NODE_ENV = 'production'
   PORT = '8080'
+  PUBLIC_BASE_URL = 'https://multidownloads-backend.fly.dev'
 
 [http_service]
   internal_port = 8080

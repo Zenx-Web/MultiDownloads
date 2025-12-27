@@ -2,8 +2,12 @@ import { Router } from 'express';
 import { initiateDownload, downloadFile, getVideoInfo } from '../controllers/downloadController';
 import { downloadLimiter } from '../middlewares/rateLimiter';
 import { checkFreeTierLimits } from '../middlewares/tierLimits';
+import { optionalAuth } from '../middlewares/auth';
 
 const router = Router();
+
+// Attach optional auth so signed-in users bypass free tier restrictions
+router.use(optionalAuth);
 
 /**
  * POST /api/download/info

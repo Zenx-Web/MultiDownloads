@@ -18,6 +18,8 @@ export interface AuthResponse {
   error?: string;
 }
 
+const getFrontendBaseUrl = () => process.env.FRONTEND_URL || 'http://localhost:3000';
+
 /**
  * Sign up a new user
  */
@@ -116,7 +118,7 @@ export const verifyToken = async (token: string): Promise<{ user: User | null; e
  */
 export const resetPassword = async (email: string): Promise<{ error?: string }> => {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`,
+    redirectTo: `${getFrontendBaseUrl()}/reset-password`,
   });
 
   if (error) {
@@ -139,4 +141,28 @@ export const updatePassword = async (newPassword: string): Promise<{ error?: str
   }
 
   return {};
+};
+
+export const signInWithProvider = async (
+  provider: 'google',
+  redirectTo?: string
+): Promise<{ url: string | null; error?: string }> => {
+  const destination = redirectTo || `${getFrontendBaseUrl()}/auth/callback`;
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: destination,
+      skipBrowserRedirect: true,
+    },
+  });
+
+  if (error || !data?.url) {
+    return {
+      url: null,
+      error: error?.message || 'Unable to initiate Google sign-in',
+    };
+  }
+
+  return { url: data.url };
 };

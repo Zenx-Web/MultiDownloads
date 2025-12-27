@@ -1,4 +1,23 @@
-'use client';
+import { buildPageMetadata } from '@/lib/seo';
+
+export const metadata = buildPageMetadata({
+  title: 'ToolsHub | Free Video Downloaders & File Conversion Suite',
+  description:
+    'Download from YouTube, Instagram, Facebook, and TikTok plus convert videos, audio, images, and PDFs with 29+ pro-grade online tools.',
+  path: '/',
+  keywords: [
+    'free video downloader',
+    'youtube downloader',
+    'instagram downloader',
+    'tiktok downloader',
+    'facebook video download',
+    'online file converter',
+    'pdf tools',
+    'image tools',
+    'audio converter',
+    'video converter',
+  ],
+});
 
 export default function HomePage() {
   const downloaders = [

@@ -52,6 +52,11 @@ const getUserLimits = (userId: string): UserLimits => {
  * TODO: Check user subscription status from database when auth is implemented
  */
 export const checkFreeTierLimits = (req: Request, _res: Response, next: NextFunction) => {
+  // Signed-in users bypass free-tier limits. Future subscriptions can add tier checks here.
+  if ((req as any).user) {
+    return next();
+  }
+
   const userId = getUserIdentifier(req);
   const limits = getUserLimits(userId);
 

@@ -7,8 +7,11 @@ import {
 } from '../controllers/convertController';
 import { downloadLimiter } from '../middlewares/rateLimiter';
 import { checkFreeTierLimits } from '../middlewares/tierLimits';
+import { optionalAuth } from '../middlewares/auth';
 
 const router = Router();
+
+router.use(optionalAuth);
 
 /**
  * POST /api/convert/video

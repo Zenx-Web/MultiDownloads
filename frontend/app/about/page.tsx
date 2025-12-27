@@ -1,10 +1,12 @@
-import type { Metadata } from 'next';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'About Us - ToolsHub',
+export const metadata = buildPageMetadata({
+  title: 'About ToolsHub | Mission, Values & Team',
   description:
-    'Learn about ToolsHub, our mission to provide free online tools for everyone, and the team behind the platform.',
-};
+    'Discover the story behind ToolsHub, our mission to deliver powerful free online tools, and the values that guide our roadmap.',
+  path: '/about',
+  keywords: ['about toolshub', 'toolshub mission', 'online tools team'],
+});
 
 export default function AboutPage() {
   return (

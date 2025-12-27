@@ -1,10 +1,12 @@
-import type { Metadata } from 'next';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Terms and Conditions - ToolsHub',
+export const metadata = buildPageMetadata({
+  title: 'Terms & Conditions | ToolsHub Usage Guidelines',
   description:
-    'Read our terms and conditions to understand the rules and regulations for using ToolsHub services.',
-};
+    'Review the ToolsHub terms of service covering account usage, copyright compliance, subscriptions, and acceptable use policies.',
+  path: '/terms',
+  keywords: ['toolshub terms', 'toolshub conditions', 'online downloader terms'],
+});
 
 export default function TermsAndConditions() {
   return (

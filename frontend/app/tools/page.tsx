@@ -1,4 +1,19 @@
-'use client';
+import { buildPageMetadata } from '@/lib/seo';
+
+export const metadata = buildPageMetadata({
+  title: 'All Online Tools & Downloaders | ToolsHub',
+  description:
+    'Browse every ToolsHub downloader, converter, PDF utility, and media editor in one place. Launch 29+ browser tools without installing software.',
+  path: '/tools',
+  keywords: [
+    'online tools list',
+    'video download tools',
+    'media converters',
+    'pdf utilities',
+    'image editors',
+    'toolshub tools',
+  ],
+});
 
 export default function ToolsPage() {
   const downloaders = [

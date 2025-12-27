@@ -1,9 +1,12 @@
 import LoginForm from '@/components/LoginForm';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata = {
-  title: 'Login - MultiDownloader',
-  description: 'Sign in to your MultiDownloader account',
-};
+export const metadata = buildPageMetadata({
+  title: 'Login | Access Your ToolsHub Account',
+  description: 'Sign in to ToolsHub to sync downloads, manage premium features, and track your processing history.',
+  path: '/login',
+  keywords: ['toolshub login', 'sign in toolshub', 'account access'],
+});
 
 export default function LoginPage() {
   return (

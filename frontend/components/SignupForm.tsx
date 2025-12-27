@@ -12,7 +12,8 @@ export default function SignupForm() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signUp } = useAuth();
+  const { signUp, signInWithGoogle } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,6 +45,16 @@ export default function SignupForm() {
         router.push('/');
         router.refresh();
       }, 2000);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setGoogleLoading(true);
+    const result = await signInWithGoogle();
+    if (result.error) {
+      setError(result.error);
+      setGoogleLoading(false);
     }
   };
 
@@ -133,6 +144,27 @@ export default function SignupForm() {
           {loading ? 'Creating account...' : 'Sign Up'}
         </button>
       </form>
+
+      <div className="my-4 flex items-center text-sm text-gray-500">
+        <div className="flex-grow border-t border-gray-200" />
+        <span className="px-3">or</span>
+        <div className="flex-grow border-t border-gray-200" />
+      </div>
+
+      <button
+        type="button"
+        onClick={handleGoogleSignIn}
+        disabled={googleLoading}
+        className="w-full flex items-center justify-center gap-2 border border-gray-300 rounded-lg py-2 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <svg className="h-5 w-5" viewBox="0 0 533.5 544.3" aria-hidden="true">
+          <path fill="#4285f4" d="M533.5 278.4c0-17.4-1.6-34.1-4.7-50.4H272v95.3h147.5c-6.4 34.6-25.7 63.9-54.7 83.5v69.2h88.4c51.8-47.7 80.3-118 80.3-197.6z" />
+          <path fill="#34a853" d="M272 544.3c74 0 136.1-24.5 181.5-66.3l-88.4-69.2c-24.5 16.4-55.8 26-93.1 26-71.5 0-132.1-48.3-153.9-113.2H25.7v71.2C70.8 482.9 164.1 544.3 272 544.3z" />
+          <path fill="#fbbc04" d="M118.1 321.6c-4.2-12.7-6.6-26.3-6.6-40.3s2.4-27.6 6.6-40.3v-71.2H25.7C9.3 208.3 0 241.3 0 276.3s9.3 68 25.7 96.5z" />
+          <path fill="#ea4335" d="M272 107.7c40.3 0 76.4 13.9 104.8 41.2l78.6-78.6C408 24.5 346 0 272 0 164.1 0 70.8 61.4 25.7 156.1l92.4 71.2C139.9 156 200.5 107.7 272 107.7z" />
+        </svg>
+        {googleLoading ? 'Redirecting...' : 'Continue with Google'}
+      </button>
 
       <div className="mt-4 text-center text-sm text-gray-600">
         Already have an account?{' '}

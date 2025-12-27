@@ -32,6 +32,19 @@ Backend API for the MultiDownloader web application - A comprehensive media down
 backend/
 ├── src/
 │   ├── config/           # Configuration files
+
+### Start Google Sign-In
+```
+POST /api/auth/signin/google
+Body: {
+  "redirectTo": "https://your-frontend.com/auth/callback" // optional
+}
+Response: {
+  "success": true,
+  "data": { "url": "https://..." }
+}
+```
+Use the returned URL to redirect the browser to Google's OAuth consent screen via Supabase. If no `redirectTo` is provided the backend falls back to `FRONTEND_URL/auth/callback`.
 │   │   └── index.ts      # App configuration
 │   ├── controllers/      # Request handlers
 │   │   ├── downloadController.ts
@@ -86,9 +99,13 @@ backend/
    Edit `.env` and configure:
    - `PORT`: Server port (default: 5000)
    - `CORS_ORIGIN`: Frontend URL (default: http://localhost:3000)
+  - `FRONTEND_URL`: Public frontend URL used for auth redirects (default: http://localhost:3000)
+  - `PUBLIC_BASE_URL`: Fully-qualified backend URL used in download links (default: http://localhost:5000)
    - `FFMPEG_PATH`: Path to FFmpeg binary
    - `TEMP_STORAGE_DIR`: Temporary file storage directory
    - Rate limiting and tier limits
+  - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`: Required for Supabase auth (email/password + Google)
+  - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: OAuth credentials copied from Google Cloud when enabling the Supabase Google provider
 
 4. **Ensure temp directory exists**:
    ```powershell
@@ -110,6 +127,28 @@ npm start
 ```
 
 ## API Endpoints
+
+### Google OAuth Setup
+1. Create an OAuth 2.0 Web Client in Google Cloud Console and add Supabase's redirect URI (shown in Supabase → Authentication → Providers → Google).
+2. Copy the client ID/secret into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (local `.env` + Fly.io secrets).
+3. In Supabase, enable the Google provider and paste the same credentials; set `FRONTEND_URL` so the backend can build the callback fallback of `<FRONTEND_URL>/auth/callback`.
+4. Redeploy backend/frontend after updating secrets.
+
+When deploying:
+
+- **Fly.io backend**
+  ```powershell
+  flyctl secrets set GOOGLE_CLIENT_ID="<client-id>" GOOGLE_CLIENT_SECRET="<client-secret>"
+  ```
+  Also ensure `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `FRONTEND_URL`, and `PUBLIC_BASE_URL` are present.
+
+- **Vercel frontend**
+  ```powershell
+  vercel env add GOOGLE_CLIENT_ID
+  vercel env add GOOGLE_CLIENT_SECRET
+  ```
+  Repeat for `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_API_URL`. Redeploy via `vercel deploy --prod` after secrets are in place.
+
 
 ### Health Check
 ```

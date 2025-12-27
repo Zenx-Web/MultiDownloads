@@ -7,6 +7,7 @@ import {
   resetPasswordHandler,
   updatePasswordHandler,
   getCurrentUserHandler,
+  googleSignInHandler,
 } from '../controllers/authController';
 import { requireAuth } from '../middlewares/auth';
 
@@ -15,6 +16,7 @@ const router = Router();
 // Public routes
 router.post('/signup', signUpHandler);
 router.post('/signin', signInHandler);
+router.post('/signin/google', googleSignInHandler);
 router.post('/signout', signOutHandler);
 router.post('/reset-password', resetPasswordHandler);
 router.get('/session', getSessionHandler);

@@ -1,10 +1,12 @@
-import type { Metadata } from 'next';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Privacy Policy - ToolsHub',
+export const metadata = buildPageMetadata({
+  title: 'Privacy Policy | How ToolsHub Protects Your Data',
   description:
-    'Read our comprehensive privacy policy to understand how ToolsHub collects, uses, and protects your personal information.',
-};
+    'Understand how ToolsHub collects, stores, and protects your personal data, files, and payment information when you use our online tools.',
+  path: '/privacy',
+  keywords: ['toolshub privacy policy', 'data protection', 'online tool privacy'],
+});
 
 export default function PrivacyPolicy() {
   return (

@@ -1,9 +1,12 @@
 import SignupForm from '@/components/SignupForm';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata = {
-  title: 'Sign Up - MultiDownloader',
-  description: 'Create your MultiDownloader account',
-};
+export const metadata = buildPageMetadata({
+  title: 'Create a Free ToolsHub Account',
+  description: 'Sign up for ToolsHub to unlock unlimited downloads, faster conversions, and synced preferences across devices.',
+  path: '/signup',
+  keywords: ['toolshub signup', 'create toolshub account', 'register toolshub'],
+});
 
 export default function SignupPage() {
   return (

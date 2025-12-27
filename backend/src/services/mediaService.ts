@@ -4,10 +4,26 @@ import ffmpeg from 'fluent-ffmpeg';
 import sharp from 'sharp';
 import puppeteer from 'puppeteer';
 import { updateJob } from './jobService';
+import { config } from '../config';
 
 // Set FFmpeg path
 const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
 ffmpeg.setFfmpegPath(ffmpegPath);
+
+const inferPublicBaseUrl = () => {
+  const envUrl = process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL;
+  if (envUrl) {
+    return envUrl.replace(/\/$/, '');
+  }
+
+  // Fallback to localhost using configured port
+  return `http://localhost:${process.env.PORT || config.port || 5000}`;
+};
+
+const publicBaseUrl = inferPublicBaseUrl();
+
+const buildDownloadUrl = (filePath: string) =>
+  `${publicBaseUrl}/uploads/${path.basename(filePath)}`;
 
 /**
  * Trim/Cut Video
@@ -37,7 +53,7 @@ export const trimVideo = async (
         }
       })
       .on('end', () => {
-        const downloadUrl = `http://localhost:5000/uploads/${path.basename(outputPath)}`;
+        const downloadUrl = buildDownloadUrl(outputPath);
         updateJob(jobId, {
           status: 'completed',
           filePath: outputPath,
@@ -129,7 +145,7 @@ export const addWatermark = async (
     .composite([{ input: svgWatermark, blend: 'over' }])
     .toFile(outputPath);
 
-  const downloadUrl = `http://localhost:5000/uploads/${path.basename(outputPath)}`;
+  const downloadUrl = buildDownloadUrl(outputPath);
   updateJob(jobId, {
     status: 'completed',
     filePath: outputPath,
@@ -175,7 +191,7 @@ export const removeBackground = async (
   // Clean up mask file
   fs.unlinkSync(outputPath + '.mask.png');
 
-  const downloadUrl = `http://localhost:5000/uploads/${path.basename(outputPath)}`;
+  const downloadUrl = buildDownloadUrl(outputPath);
   updateJob(jobId, {
     status: 'completed',
     filePath: outputPath,
@@ -224,7 +240,7 @@ export const captureScreenshot = async (
 
     await browser.close();
 
-    const downloadUrl = `http://localhost:5000/uploads/${path.basename(outputPath)}`;
+    const downloadUrl = buildDownloadUrl(outputPath);
     updateJob(jobId, {
       status: 'completed',
       filePath: outputPath,
@@ -258,7 +274,7 @@ export const textToSpeech = async (
         });
         reject(err);
       } else {
-        const downloadUrl = `http://localhost:5000/uploads/${path.basename(outputPath)}`;
+        const downloadUrl = buildDownloadUrl(outputPath);
         updateJob(jobId, {
           status: 'completed',
           filePath: outputPath,
