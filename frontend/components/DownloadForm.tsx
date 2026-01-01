@@ -15,7 +15,7 @@ const FREE_PLAN = getPlan('free');
 const FREE_PLAN_LIMIT_LABEL =
   FREE_PLAN.dailyLimit === null ? 'Unlimited downloads' : `${FREE_PLAN.dailyLimit} downloads/day`;
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
 
 interface DownloadFormProps {
   onJobCreated?: (jobId: string) => void;
@@ -111,29 +111,33 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
     if (downloadState.jobId && downloadState.status === 'processing') {
       const interval = setInterval(async () => {
         try {
-          const response = await axios.get(`${API_URL}/status/${downloadState.jobId}`, authHeaders);
-          const job = response.data.data;
+          const response = await axios.get(`${API_URL}/jobs/${downloadState.jobId}`, authHeaders);
+          const job = response.data;
 
-          setDownloadState(prev => ({ ...prev, progress: job.progress || 0 }));
+          // Map backend statuses to UI progress.
+          const progress =
+            job.status === 'queued' ? 10 : job.status === 'processing' ? 55 : job.status === 'ready' ? 100 : 0;
 
-          if (job.status === 'completed') {
-            setDownloadState(prev => ({
+          setDownloadState((prev) => ({ ...prev, progress }));
+
+          if (job.status === 'ready') {
+            const linkResponse = await axios.get(
+              `${API_URL}/jobs/${downloadState.jobId}/download-link`,
+              authHeaders
+            );
+            setDownloadState((prev) => ({
               ...prev,
               status: 'ready',
               progress: 100,
-              downloadUrl: job.downloadUrl,
+              downloadUrl: linkResponse.data.url,
             }));
             clearInterval(interval);
-            
-            // If job includes updated usage count, use it for optimistic update
-            if (typeof job.downloadsUsedToday === 'number') {
-              refreshSubscription();
-            }
-          } else if (job.status === 'failed') {
-            setDownloadState(prev => ({
+            refreshUsageSnapshot();
+          } else if (job.status === 'failed' || job.status === 'expired') {
+            setDownloadState((prev) => ({
               ...prev,
               status: 'idle',
-              error: job.error || 'Download failed',
+              error: job.error?.message || 'Download failed',
             }));
             clearInterval(interval);
           }
@@ -164,51 +168,20 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
       });
 
       try {
-        // Fetch video info
-        const infoResponse = await axios.post(
-          `${API_URL}/download/info`,
+        // Submit a single URL job to the controlled backend queue
+        const submitResponse = await axios.post(
+          `${API_URL}/jobs`,
           {
             url,
-            ...(cookies && { cookies }),
+            kind: action === 'audio' ? 'audio' : 'video',
           },
           authHeaders
         );
-        
-        if (!infoResponse.data.success) {
-          throw new Error(infoResponse.data.error || 'Failed to fetch video info');
-        }
 
-        const videoInfo = infoResponse.data.data;
-
+        const jobId = submitResponse.data.jobId;
         setDownloadState(prev => ({
           ...prev,
-          videoInfo,
           status: 'processing',
-          progress: 5,
-        }));
-
-        // Start download process - include YouTube sessionId for OAuth if connected
-        const downloadResponse = await axios.post(
-          `${API_URL}/download`,
-          {
-            url,
-            quality: action === 'audio' ? '720p' : quality,
-            format: action === 'audio' ? 'mp3' : format,
-            action: action === 'audio' ? 'audio-only' : 'download',
-            platform: 'auto',
-            ...(cookies && { cookies }),
-            ...(youtubeSessionId && { sessionId: youtubeSessionId }),
-          },
-          authHeaders
-        );
-
-        if (!downloadResponse.data.success) {
-          throw new Error(downloadResponse.data.error || 'Failed to start download');
-        }
-
-        const jobId = downloadResponse.data.data.jobId;
-        setDownloadState(prev => ({
-          ...prev,
           jobId,
         }));
 
@@ -219,30 +192,20 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
         refreshUsageSnapshot();
 
       } catch (err: any) {
-        const errorMsg = err.response?.data?.error || err.message || 'Failed to process request';
-        const errorMessage = err.response?.data?.message || errorMsg;
-        
-        // Check if authentication is required
-        if (errorMsg.includes('Authentication required') || errorMsg.includes('rate-limit') || errorMsg.includes('login required')) {
-          setDownloadState({
-            videoInfo: null,
-            jobId: null,
-            status: 'idle',
-            progress: 0,
-            error: errorMessage,
-            downloadUrl: null,
-          });
-          setShowCookiesInput(true); // Show cookies input when auth is needed
-        } else {
-          setDownloadState({
-            videoInfo: null,
-            jobId: null,
-            status: 'idle',
-            progress: 0,
-            error: errorMessage,
-            downloadUrl: null,
-          });
-        }
+        const errorMessage =
+          err.response?.data?.error?.message ||
+          err.response?.data?.error ||
+          err.message ||
+          'Failed to process request';
+
+        setDownloadState({
+          videoInfo: null,
+          jobId: null,
+          status: 'idle',
+          progress: 0,
+          error: errorMessage,
+          downloadUrl: null,
+        });
         console.error('Download error:', err);
       }
     }

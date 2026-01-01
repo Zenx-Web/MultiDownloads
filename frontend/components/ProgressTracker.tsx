@@ -6,7 +6,7 @@ import { downloadFileFromApi } from '@/lib/fileDownload';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useAuth } from '@/contexts/AuthContext';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
 
 interface ProgressTrackerProps {
   jobId: string;
@@ -15,7 +15,7 @@ interface ProgressTrackerProps {
 
 interface JobStatus {
   id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'queued' | 'processing' | 'ready' | 'failed' | 'expired';
   progress: number;
   message?: string;
   downloadUrl?: string;
@@ -44,15 +44,22 @@ export default function ProgressTracker({ jobId, onReset }: ProgressTrackerProps
   useEffect(() => {
     const pollStatus = async () => {
       try {
-        const response = await axios.get(`${API_URL}/status/${jobId}`, authHeaders);
-        
-        if (response.data.success) {
-          setJob(response.data.data);
+        const response = await axios.get(`${API_URL}/jobs/${jobId}`, authHeaders);
+        const data = response.data;
 
-          // Stop polling if job is completed or failed
-          if (response.data.data.status === 'completed' || response.data.data.status === 'failed') {
-            return;
-          }
+        const progress =
+          data.status === 'queued' ? 10 : data.status === 'processing' ? 55 : data.status === 'ready' ? 100 : 0;
+
+        setJob({
+          id: data.id,
+          status: data.status,
+          progress,
+          error: data.error?.message || data.error,
+        });
+
+        // Stop polling if job is ready/failed/expired
+        if (data.status === 'ready' || data.status === 'failed' || data.status === 'expired') {
+          return;
         }
       } catch (err: any) {
         setError(err.response?.data?.error || 'Failed to fetch status');
@@ -64,7 +71,7 @@ export default function ProgressTracker({ jobId, onReset }: ProgressTrackerProps
 
     // Then poll every 2 seconds
     const interval = setInterval(() => {
-      if (job?.status !== 'completed' && job?.status !== 'failed') {
+      if (job?.status !== 'ready' && job?.status !== 'failed' && job?.status !== 'expired') {
         pollStatus();
       }
     }, 2000);
@@ -73,23 +80,24 @@ export default function ProgressTracker({ jobId, onReset }: ProgressTrackerProps
   }, [jobId, job?.status, authHeaders]);
 
   useEffect(() => {
-    if (job?.status === 'completed' && !usageRefreshed) {
+    if (job?.status === 'ready' && !usageRefreshed) {
       refreshSubscription().catch((refreshError) => {
         console.warn('[subscription] unable to refresh after job completion', refreshError);
       });
       setUsageRefreshed(true);
     }
 
-    if (job?.status !== 'completed' && usageRefreshed) {
+    if (job?.status !== 'ready' && usageRefreshed) {
       setUsageRefreshed(false);
     }
   }, [job?.status, usageRefreshed, refreshSubscription]);
 
   const getStatusColor = () => {
     switch (job?.status) {
-      case 'completed':
+      case 'ready':
         return 'bg-green-500';
       case 'failed':
+      case 'expired':
         return 'bg-red-500';
       case 'processing':
         return 'bg-blue-500';
@@ -100,9 +108,10 @@ export default function ProgressTracker({ jobId, onReset }: ProgressTrackerProps
 
   const getStatusIcon = () => {
     switch (job?.status) {
-      case 'completed':
+      case 'ready':
         return '✓';
       case 'failed':
+      case 'expired':
         return '✗';
       case 'processing':
         return '⏳';
@@ -131,7 +140,7 @@ export default function ProgressTracker({ jobId, onReset }: ProgressTrackerProps
         )}
 
         {/* Progress Bar */}
-        {job && job.status !== 'failed' && (
+        {job && job.status !== 'failed' && job.status !== 'expired' && (
           <div className="mb-6">
             <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
               <div
@@ -145,14 +154,14 @@ export default function ProgressTracker({ jobId, onReset }: ProgressTrackerProps
 
         {/* Action Buttons */}
         <div className="flex gap-4 justify-center">
-          {job?.status === 'completed' && (
+          {job?.status === 'ready' && (
             <button
               onClick={async () => {
-                if (!job?.downloadUrl) return;
                 setDownloading(true);
                 setError('');
                 try {
-                  await downloadFileFromApi(job.downloadUrl, API_URL);
+                  const linkResponse = await axios.get(`${API_URL}/jobs/${jobId}/download-link`, authHeaders);
+                  await downloadFileFromApi(linkResponse.data.url, API_URL);
                   refreshSubscription().catch((refreshError) => {
                     console.warn('[subscription] unable to refresh after download', refreshError);
                   });
@@ -175,7 +184,7 @@ export default function ProgressTracker({ jobId, onReset }: ProgressTrackerProps
             disabled={downloading}
             className="bg-gray-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            {job?.status === 'completed' || job?.status === 'failed'
+            {job?.status === 'ready' || job?.status === 'failed' || job?.status === 'expired'
               ? 'Start New Download'
               : 'Cancel'}
           </button>
