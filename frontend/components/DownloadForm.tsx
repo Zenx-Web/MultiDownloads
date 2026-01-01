@@ -7,7 +7,7 @@ import ProgressTracker from './ProgressTracker';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useAuth } from '@/contexts/AuthContext';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api').replace(/^\uFEFF/, '').trim();
 
 interface DownloadFormProps {
   onJobCreated?: (jobId: string) => void;
