@@ -77,6 +77,35 @@ export async function createApiServer(): Promise<express.Express> {
     res.status(200).json({ ok: true });
   });
 
+  // Legacy/unsupported endpoints from earlier versions of the product.
+  // We return structured JSON to avoid confusing 404s in the UI.
+  app.all('/api/media/*', (_req, res) => {
+    return res.status(501).json({
+      error: {
+        code: 'NOT_IMPLEMENTED',
+        message: 'Media tools are not available in this deployment.'
+      }
+    });
+  });
+
+  app.all('/api/status/*', (_req, res) => {
+    return res.status(410).json({
+      error: {
+        code: 'GONE',
+        message: 'This endpoint is deprecated. Use GET /api/jobs/:jobId instead.'
+      }
+    });
+  });
+
+  app.all('/api/download/info', (_req, res) => {
+    return res.status(410).json({
+      error: {
+        code: 'GONE',
+        message: 'This endpoint is deprecated. Submit a job via POST /api/jobs.'
+      }
+    });
+  });
+
   app.post('/api/jobs', async (req, res, next) => {
     try {
       const parsed = submitJobSchema.safeParse(req.body);
