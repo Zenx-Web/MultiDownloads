@@ -1,5 +1,6 @@
 import express, { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
+import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 
@@ -45,6 +46,24 @@ export async function createApiServer(): Promise<express.Express> {
 
   const app = express();
   app.set('trust proxy', true);
+
+  const corsOriginsRaw = (process.env.CORS_ORIGINS ?? '').trim();
+  const corsOrigins = corsOriginsRaw
+    ? corsOriginsRaw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : null;
+
+  app.use(
+    cors({
+      // If allowlist is empty, reflect the request origin.
+      origin: corsOrigins && corsOrigins.length > 0 ? corsOrigins : true,
+      methods: ['GET', 'POST', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      maxAge: 600,
+    })
+  );
 
   app.use(helmet());
   app.use(express.json({ limit: '32kb' }));
