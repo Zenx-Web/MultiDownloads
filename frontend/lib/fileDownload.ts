@@ -28,7 +28,7 @@ export const downloadFileFromApi = async (downloadPath: string, apiUrl?: string)
 
   const response = await fetch(absoluteUrl, {
     method: 'GET',
-    credentials: 'include',
+    credentials: 'omit',
     mode: 'cors',
   });
 
