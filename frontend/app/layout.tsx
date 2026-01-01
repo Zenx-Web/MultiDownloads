@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { YouTubeOAuthProvider } from '@/contexts/YouTubeOAuthContext';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -144,11 +145,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className}>
         <AuthProvider>
           <SubscriptionProvider>
-            <div className="flex flex-col min-h-screen">
-              <Navbar />
-              <main className="flex-grow">{children}</main>
-              <Footer />
-            </div>
+            <YouTubeOAuthProvider>
+              <div className="flex flex-col min-h-screen">
+                <Navbar />
+                <main className="flex-grow">{children}</main>
+                <Footer />
+              </div>
+            </YouTubeOAuthProvider>
           </SubscriptionProvider>
         </AuthProvider>
       </body>

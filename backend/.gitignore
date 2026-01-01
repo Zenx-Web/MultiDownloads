@@ -1,33 +1,12 @@
-# Dependencies
 node_modules/
-yarn.lock
-
-# Build output
 dist/
 
-# Environment variables
-.env
-.env.local
-.env.production
+# Local temp/test data
+storage/
+data/
+storage_test/
+data_test/
+worker.lock
 
-# Logs
-logs/
-*.log
-npm-debug.log*
-
-# Temp files
-temp/
-*.tmp
-
-# Cookies (sensitive)
-cookies.txt
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+# Smoke test artifacts
+download_test.bin

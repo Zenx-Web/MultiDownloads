@@ -4,10 +4,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import CookieConsent from './CookieConsent';
+import YouTubeConnect from './YouTubeConnect';
 import { downloadFileFromApi } from '@/lib/fileDownload';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { getPlan } from '@/lib/plans';
 import { useAuth } from '@/contexts/AuthContext';
+import { useYouTubeOAuth } from '@/contexts/YouTubeOAuthContext';
 
 const FREE_PLAN = getPlan('free');
 const FREE_PLAN_LIMIT_LABEL =
@@ -54,6 +56,7 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
   const [downloadState, setDownloadState] = useState<DownloadState>(() => createInitialDownloadState());
   const { refresh: refreshSubscription } = useSubscription();
   const { session } = useAuth();
+  const { sessionId: youtubeSessionId, isConnected: youtubeConnected } = useYouTubeOAuth();
   const authToken = session?.access_token || null;
   const authHeaders = useMemo(() => {
     if (!authToken) {
@@ -184,7 +187,7 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
           progress: 5,
         }));
 
-        // Start download process
+        // Start download process - include YouTube sessionId for OAuth if connected
         const downloadResponse = await axios.post(
           `${API_URL}/download`,
           {
@@ -194,6 +197,7 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
             action: action === 'audio' ? 'audio-only' : 'download',
             platform: 'auto',
             ...(cookies && { cookies }),
+            ...(youtubeSessionId && { sessionId: youtubeSessionId }),
           },
           authHeaders
         );
@@ -314,6 +318,27 @@ export default function DownloadForm({ onJobCreated }: DownloadFormProps) {
             required
           />
         </div>
+
+        {/* YouTube Connect - Show for YouTube URLs */}
+        {url.includes('youtube.com') || url.includes('youtu.be') ? (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <h4 className="font-medium text-gray-900 text-sm mb-1">
+                  {youtubeConnected ? '✅ YouTube Connected' : '🔗 Connect YouTube Account'}
+                </h4>
+                <p className="text-xs text-gray-500">
+                  {youtubeConnected 
+                    ? 'Downloads will use your authenticated account for best results.'
+                    : 'Connect your account to bypass download restrictions and avoid bot detection.'}
+                </p>
+              </div>
+              <div className="ml-4">
+                <YouTubeConnect compact />
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Cookies Input (shows when needed) */}
         {showCookiesInput && (

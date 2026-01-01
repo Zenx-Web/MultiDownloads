@@ -1,16 +1,11 @@
-# Use Node.js LTS with Bookworm (has Python 3.11)
+# Use Node.js LTS
 FROM node:20-bookworm-slim
 
-# Install FFmpeg, Python 3.11, and yt-dlp
+# Install ffmpeg/ffprobe for metadata probing (no browsers, no cookies, no automation)
 RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    python3 \
-    python3-pip \
-    ca-certificates \
-    wget \
-    && rm -rf /var/lib/apt/lists/* \
-    && wget -q https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp \
-    && chmod a+rx /usr/local/bin/yt-dlp
+  ffmpeg \
+  ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -18,22 +13,17 @@ WORKDIR /app
 # Copy backend package files first
 COPY backend/package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install dependencies (includes dev deps for TypeScript build)
+RUN npm ci && npm cache clean --force
 
 # Copy ALL backend source files
 COPY backend/ ./
 
-# Include bundled cookie files for yt-dlp fallbacks
-COPY cookies_update.txt ./
-COPY cookies_music.txt ./
-COPY youtube_cookies_fresh.txt ./
-
 # Build TypeScript
-RUN npm install typescript @types/node --save-dev && npm run build
+RUN npm run build
 
 # Remove dev dependencies after build
-RUN npm prune --production
+RUN npm prune --omit=dev
 
 # Create temp directory
 RUN mkdir -p /app/temp && chmod 777 /app/temp
@@ -48,5 +38,5 @@ ENV NODE_ENV=production
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:8080/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start the application
-CMD ["node", "dist/index.js"]
+# Start the API process by default (workers run via a separate process/command)
+CMD ["node", "dist/api.js"]

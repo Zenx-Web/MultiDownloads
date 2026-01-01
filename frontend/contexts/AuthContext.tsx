@@ -15,7 +15,6 @@ interface AuthContextType {
   signInWithGoogle: (redirectPath?: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error?: string }>;
-  signInWithGoogle: () => Promise<{ error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -124,34 +123,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return {};
   };
 
-  const signInWithGoogle = async () => {
-    try {
-      const response = await fetch(`${API_URL}/auth/signin/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ redirectTo: `${window.location.origin}/auth/callback` }),
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        return { error: payload?.message || 'Failed to start Google sign-in' };
-      }
-
-      const url = payload?.data?.url;
-      if (!url) {
-        return { error: 'Missing redirect URL from server' };
-      }
-
-      window.location.href = url;
-      return {};
-    } catch (error) {
-      return {
-        error: error instanceof Error ? error.message : 'Failed to start Google sign-in',
-      };
-    }
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -163,7 +134,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithGoogle,
         signOut,
         resetPassword,
-        signInWithGoogle,
       }}
     >
       {children}
